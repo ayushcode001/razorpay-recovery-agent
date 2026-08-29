@@ -1,0 +1,105 @@
+[
+  {
+    "timestamp": "2026-08-29T13:25:47.525350+00:00",
+    "payment_id": "pay_Tkx9NIQ0Wobtqn",
+    "amount": 33717,
+    "error_code": "insufficient_funds",
+    "category": "retry_later",
+    "action": "retry_after_cooldown",
+    "attempted": true,
+    "predicted_success_prob": 0.708,
+    "reason": "error_code='insufficient_funds' -> category='retry_later'. Predicted success probability 0.71 clears threshold (0.62) and retry budget available. Executing 'retry_after_cooldown'.",
+    "outcome": {
+      "succeeded": true
+    }
+  },
+  {
+    "timestamp": "2026-08-29T13:27:15.112000+00:00",
+    "payment_id": "pay_live_test_84120",
+    "amount": 1299.0,
+    "error_code": "bank_technical_error",
+    "category": "smart_retry",
+    "action": "retry_with_backoff",
+    "attempted": true,
+    "predicted_success_prob": 0.725,
+    "reason": "error_code='bank_technical_error' -> category='smart_retry'. Predicted success probability 0.72 clears threshold (0.62) and retry budget available. Executing 'retry_with_backoff'.",
+    "outcome": {
+      "execution": {
+        "payment_link": "https://rzp.io/i/mock_plink_1724938035",
+        "status": "payment_link_created"
+      }
+    }
+  },
+  {
+    "timestamp": "2026-08-29T13:27:17.432000+00:00",
+    "payment_id": "pay_live_test_84121",
+    "amount": 1299.0,
+    "error_code": "payment_risk_check_failed",
+    "category": "escalate",
+    "action": "escalate_to_human",
+    "attempted": false,
+    "predicted_success_prob": 0.049,
+    "reason": "error_code='payment_risk_check_failed' is in the do-not-auto-retry class (risk/compliance/international-block). Policy forbids autonomous action here regardless of predicted success -- escalated to human review.",
+    "outcome": null
+  },
+  {
+    "timestamp": "2026-08-29T13:27:19.889000+00:00",
+    "payment_id": "pay_live_test_84122",
+    "amount": 1299.0,
+    "error_code": "card_expired",
+    "category": "change_method",
+    "action": "prompt_new_payment_method",
+    "attempted": true,
+    "predicted_success_prob": 0.726,
+    "reason": "error_code='card_expired' -> category='change_method'. Predicted success probability 0.73 clears threshold (0.62) and retry budget available. Executing 'prompt_new_payment_method'.",
+    "outcome": {
+      "execution": {
+        "notification": {
+          "action": "prompt_new_payment_method",
+          "dispatched": true,
+          "recipient": "customer.test@example.com",
+          "recovery_link": "https://rzp.io/i/mock_plink_1724938039",
+          "smtp_error": null,
+          "smtp_sent": false
+        },
+        "payment_link": "https://rzp.io/i/mock_plink_1724938039"
+      }
+    }
+  },
+  {
+    "timestamp": "2026-08-29T13:27:21.140000+00:00",
+    "payment_id": "pay_live_test_84123",
+    "amount": 1299.0,
+    "error_code": "incorrect_cvv",
+    "category": "user_error",
+    "action": "reprompt_customer",
+    "attempted": true,
+    "predicted_success_prob": 0.758,
+    "reason": "error_code='incorrect_cvv' -> category='user_error'. Predicted success probability 0.76 clears threshold (0.62) and retry budget available. Executing 'reprompt_customer'.",
+    "outcome": {
+      "execution": {
+        "notification": {
+          "action": "reprompt_customer",
+          "dispatched": true,
+          "recipient": "customer.test@example.com",
+          "recovery_link": "https://rzp.io/i/mock_plink_1724938041",
+          "smtp_error": null,
+          "smtp_sent": false
+        },
+        "payment_link": "https://rzp.io/i/mock_plink_1724938041"
+      }
+    }
+  },
+  {
+    "timestamp": "2026-08-29T13:25:47.525350+00:00",
+    "payment_id": "pay_fAbnFbmOHnKYaX",
+    "amount": 762,
+    "error_code": "payment_timed_out",
+    "category": "smart_retry",
+    "action": "escalate_to_human",
+    "attempted": false,
+    "predicted_success_prob": 0.388,
+    "reason": "Predicted success probability 0.39 is below threshold 0.62. Stopping rule triggered: not worth burning an attempt (and the retry/notification cost that comes with it). Escalated instead of acting blindly.",
+    "outcome": null
+  }
+]

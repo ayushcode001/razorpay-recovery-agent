@@ -1,0 +1,13 @@
+{
+  "optimal_threshold": 0.62,
+  "baseline_threshold": 0.4,
+  "threshold_range": [
+    0.36,
+    0.62
+  ],
+  "mean_threshold": 0.45999999999999996,
+  "std_threshold": 0.0920869154657707,
+  "val_net_gain": 1021164,
+  "test_net_gain": 56694,
+  "mean_test_net_gain": 242308.2
+}
