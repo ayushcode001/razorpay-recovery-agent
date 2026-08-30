@@ -113,6 +113,8 @@ if __name__ == "__main__":
     summary_no_uplift, _, _, _ = run_batch(data_path, use_uplift=False)
 
     print("=== BATCH RUN SUMMARY (Tuned Policy + Uplift Refinement) ===")
+    net_val = summary["amount_recovered"] - summary["amount_wasted_on_failed_attempts"]
+    print(f"  Net Value (Recovered - Wasted): Rs.{net_val:,}")
     for k, v in summary.items():
         if "amount" in k:
             print(f"  {k}: Rs.{v:,}")
@@ -123,10 +125,16 @@ if __name__ == "__main__":
 
     print("\n=== UPLIFT ATTRIBUTABLE DELTA (With vs Without Uplift Gate) ===")
     diff_attempted = summary_no_uplift["attempted"] - summary["attempted"]
+    diff_rec = summary["amount_recovered"] - summary_no_uplift["amount_recovered"]
     diff_wasted = summary_no_uplift["amount_wasted_on_failed_attempts"] - summary["amount_wasted_on_failed_attempts"]
-    print(f"  Attempts diverted to skipped_low_uplift: {diff_attempted} records")
-    print(f"  Wasted spend eliminated: Rs.{diff_wasted:,} ({diff_wasted / summary_no_uplift['amount_wasted_on_failed_attempts']:.2%} reduction)")
-    print(f"  Precision on attempted cases: {summary_no_uplift['recovery_rate_of_attempted']:.2%} -> {summary['recovery_rate_of_attempted']:.2%}")
+    net_no_uplift = summary_no_uplift["amount_recovered"] - summary_no_uplift["amount_wasted_on_failed_attempts"]
+    diff_net = net_val - net_no_uplift
+    print(f"  Attempts diverted to skipped_low_uplift: {diff_attempted} records (prevents spam on organic recoveries)")
+    print(f"  Gross Recovered delta:  Rs.{diff_rec:,}")
+    print(f"  Wasted spend reduced:   Rs.{diff_wasted:,} ({diff_wasted / summary_no_uplift['amount_wasted_on_failed_attempts']:.2%} reduction)")
+    print(f"  Net Value delta in INR: Rs.{diff_net:,} ({diff_net / net_no_uplift:.2%} — roughly net-neutral trade-off)")
+    print(f"  Attempt precision gain: {summary_no_uplift['recovery_rate_of_attempted']:.2%} -> {summary['recovery_rate_of_attempted']:.2%}")
+
 
     if uplift_metrics:
         print(f"\n=== UPLIFT MODEL (Causal T-Learner) ===")
