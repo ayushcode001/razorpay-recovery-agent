@@ -27,6 +27,7 @@ from agent.taxonomy import category_for
 from agent.policy_engine import decide_action
 from agent.audit import AuditTrail
 from agent.success_predictor import train_and_eval, FEATURE_COLUMNS_NUM, FEATURE_COLUMNS_CAT
+from agent.degradation_agent import run_degradation_pipeline
 from webhook.razorpay_client import (
     RAZORPAY_KEY_ID,
     create_order,
@@ -76,6 +77,15 @@ def dashboard():
     """Live audit trail dashboard for demo monitoring."""
     summary = audit_trail.summary()
     recent_entries = list(reversed(audit_trail.entries[-25:]))
+    
+    # Load degradation alerts if timeseries dataset exists
+    degradation_incidents = []
+    try:
+        deg_res = run_degradation_pipeline()
+        degradation_incidents = deg_res.get("incidents", [])[:4]
+    except Exception as e:
+        print(f"[Server] Degradation monitoring warning: {e}")
+
     html = """
     <!DOCTYPE html>
     <html lang="en">
@@ -173,7 +183,7 @@ def dashboard():
                 display: grid;
                 grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
                 gap: 16px;
-                margin-bottom: 28px;
+                margin-bottom: 24px;
             }
             .metric-card {
                 background: var(--surface);
@@ -194,6 +204,59 @@ def dashboard():
             .metric-val.green { color: #34d399; }
             .metric-val.blue { color: #60a5fa; }
             .metric-val.amber { color: #fbbf24; }
+            
+            .alert-panel {
+                background: rgba(245, 158, 11, 0.05);
+                border: 1px solid rgba(245, 158, 11, 0.3);
+                border-radius: 12px;
+                padding: 18px 20px;
+                margin-bottom: 24px;
+            }
+            .alert-panel-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 12px;
+            }
+            .alert-panel-header h3 {
+                margin: 0;
+                font-size: 15px;
+                font-weight: 700;
+                color: #fbbf24;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .incident-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+                gap: 12px;
+            }
+            .incident-card {
+                background: #0e1526;
+                border: 1px solid #1f2d48;
+                border-radius: 8px;
+                padding: 12px 14px;
+            }
+            .inc-title {
+                font-weight: 600;
+                font-size: 13px;
+                color: #f3f4f6;
+                display: flex;
+                justify-content: space-between;
+                margin-bottom: 6px;
+            }
+            .inc-meta {
+                font-size: 11px;
+                color: #94a3b8;
+                font-family: 'JetBrains Mono', monospace;
+                line-height: 1.5;
+            }
+            .inc-impact {
+                color: #f87171;
+                font-weight: 600;
+            }
+            
             .table-container {
                 background: var(--surface);
                 border: 1px solid var(--surface-border);
@@ -278,10 +341,34 @@ def dashboard():
                     <div class="metric-val blue">{{ "{:.1%}".format(summary.recovery_rate_overall) }}</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-label">Escalated to Human Review</div>
-                    <div class="metric-val amber">{{ summary.escalated_to_human }} ({{ "{:.1%}".format(summary.escalated_to_human / (summary.total_records or 1)) }})</div>
+                    <div class="metric-label">Escalated / Filtered</div>
+                    <div class="metric-val amber">{{ summary.escalated_to_human + summary.get('skipped_low_uplift', 0) }}</div>
                 </div>
             </div>
+
+            {% if degradation_incidents %}
+            <div class="alert-panel">
+                <div class="alert-panel-header">
+                    <h3>⚡ Degradation Forecasting & Outage Alerts (Seasonal Z-Score Engine)</h3>
+                    <span style="font-size: 12px; color: #fbbf24; font-weight: 600;">Systemic Outage Detection</span>
+                </div>
+                <div class="incident-grid">
+                    {% for inc in degradation_incidents %}
+                    <div class="incident-card">
+                        <div class="inc-title">
+                            <span>{{ inc.bank }} · {{ inc.method.upper() }}</span>
+                            <span style="color: #fbbf24; font-size: 11px;">{{ inc.peak_z_score }}σ Anomaly</span>
+                        </div>
+                        <div class="inc-meta">
+                            <div>Window: {{ inc.time_window }} ({{ inc.hours_duration }}h)</div>
+                            <div>Failure Rate: <span style="color: #f87171; font-weight: 600;">{{ "{:.1%}".format(inc.peak_failure_rate) }}</span> (Norm: {{ "{:.1%}".format(inc.baseline_failure_rate) }})</div>
+                            <div class="inc-impact">Impact: ₹{{ "{:,}".format(inc.total_impact_inr) }} ({{ inc.total_excess_failures }} excess fails)</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
 
             <div class="table-container">
                 <div class="table-header">
@@ -313,6 +400,8 @@ def dashboard():
                             <td>
                                 {% if 'escalate' in entry.action %}
                                     <span class="pill pill-escalate">Escalate</span>
+                                {% elif 'skipped' in entry.action %}
+                                    <span class="pill pill-escalate" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24;">Skip (Low Uplift)</span>
                                 {% elif 'retry' in entry.action %}
                                     <span class="pill pill-retry">{{ entry.action }}</span>
                                 {% else %}
@@ -633,6 +722,16 @@ def api_audit_trail():
         "summary": audit_trail.summary(),
         "entries": audit_trail.entries,
     })
+
+
+@app.route("/api/degradation-alerts", methods=["GET"])
+def api_degradation_alerts():
+    """Returns real-time time-series outage detection alerts."""
+    try:
+        res = run_degradation_pipeline()
+        return jsonify(res), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 if __name__ == "__main__":
