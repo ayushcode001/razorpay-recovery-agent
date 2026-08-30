@@ -17,7 +17,7 @@ Built for Razorpay merchants, this system pairs strict deterministic compliance 
 | **2. Success Predictor** | Intervention Feasibility | `agent/success_predictor.py` (Gradient Boosting) | Predicts $P(\text{intervention succeeds} \mid \text{context})$ using transaction features to evaluate whether an attempt is statistically viable before burning retry budget. |
 | **3. Causal Uplift Modeler** | Organic Self-Recovery Filter | `agent/uplift_model.py` (T-Learner Causal ML) | Isolates genuine intervention lift from organic self-recovery ($\mu_1(x) - \mu_0(x)$) so merchants never waste notifications or retries on payments that would self-resolve. |
 | **4. Degradation Forecaster** | Systemic Outage Monitor | `agent/degradation_agent.py` (Seasonal Z-Score) | Detects bank and gateway outages in real-time ($z \ge 3.0\sigma$) with estimated INR revenue impact before widespread issuer latency drains merchant revenue. |
-| **5. Contextual Retry Bandit** | Dynamic Timing Optimizer | `agent/retry_bandit.py` (Thompson Sampling) | Learns the optimal retry cooldown per error category through multi-armed bandit exploration, delivering up to +412% recovery lift over static 1-minute retries. |
+| **5. Contextual Retry Bandit** | Dynamic Timing Optimizer | `agent/retry_bandit.py` (Thompson Sampling) | Learns the optimal retry cooldown per error category through multi-armed bandit exploration, validating hand-set heuristics and discovering non-obvious delay gains. |
 | **6. Strategic Cohort Analyst** | Latent Segment Discovery | `agent/cohort_analyst.py` (GMM + PCA Clustering) | Uncovers latent transaction archetypes and ranks untapped merchant segments by recoverable INR to guide strategic revenue recovery ROI. |
 
 ---
@@ -43,7 +43,7 @@ A standard pitfall in AI payment hackathons is **"Fake ML"** — training an NLP
 1. **Deterministic Taxonomy**: Domain policy decides what actions are legally and operationally *permissible*.
 2. **Success Predictor**: Learns whether an allowed intervention will *actually succeed* given transaction context.
 3. **Causal Uplift Gate**: Verifies whether our intervention adds *causal lift* or whether the customer would self-recover without us.
-4. **Data-Driven Policy Engine**: Combines taxonomy rules + tuned success threshold + uplift gate into a bounded, explainable decision.
+4. **Data-Driven Policy Engine**: Combines taxonomy rules + tuned success threshold (0.47) + uplift gate ($\ge 0.05$) into a bounded, explainable decision.
 
 ---
 
@@ -71,7 +71,9 @@ A standard pitfall in AI payment hackathons is **"Fake ML"** — training an NLP
 | `smart_retry` | 120 | **34.66%** | 25.07% | **25.13%** | 59.79% | Noticeable organic self-recovery: customer retries often work. |
 | `escalate` | 10 | **0.43%** | 3.70% | 4.17% | 4.60% | Zero uplift: autonomous intervention has no causal benefit. |
 
-> **Honest Causal Caveat**: Per-transaction ground truth uplift is fundamentally unobservable in production. Synthetic randomized holdouts validate that the estimation mathematics and pipeline are sound before deploying live A/B experiments.
+> **Calibration Bias Disclosure & Honest Causal Caveat**:
+> 1. **Calibration Bias**: The T-Learner overestimates true mean uplift by roughly 10 percentage points on average (+45.53% estimated vs +35.69% true). The moderate correlation ($r = 0.53$) confirms that the model's **relative rank-ordering is statistically meaningful for threshold gating ($\ge 0.05$)**, but raw individual uplift scores should not be treated as perfectly calibrated absolute probabilities.
+> 2. **Fundamental Causal Unobservability**: Ground-truth individual treatment effect is fundamentally unobservable in live production (you cannot observe both outcomes simultaneously for the same payment). Validating correlation on randomized synthetic holdouts confirms that the estimation mathematics, feature pipeline, and gating architecture are sound before deploying live A/B experiments.
 
 ---
 
@@ -108,6 +110,8 @@ A standard pitfall in AI payment hackathons is **"Fake ML"** — training an NLP
 
 *Surfaced dynamically on the live dashboard (`/`) and API (`/api/degradation-alerts`).*
 
+> **Honest Caveat on Time-Series Outages**: The 3 multi-hour outage incidents detected in this benchmark are the exact outage windows injected into the synthetic 30-day time-series by `data/generate_timeseries.py`. This verifies that the rolling seasonal baseline, Z-score thresholding ($3.0\sigma$), and financial loss attribution calculations execute correctly on a known ground truth — not that the model has been evaluated against a production bank streaming feed.
+
 ---
 
 ### Component C: Contextual Bandit for Dynamic Retry Timing
@@ -117,16 +121,25 @@ A standard pitfall in AI payment hackathons is **"Fake ML"** — training an NLP
 
 **The Solution**: A Beta-Bernoulli **Thompson Sampling Multi-Armed Bandit** exploring 5 discrete cooldown arms (`1 min`, `15 min`, `1 hr`, `6 hrs`, `24 hrs`).
 
-#### 5,000-Episode Simulation Convergence Results:
+#### 5,000-Episode Simulation Convergence Results (Fair Comparison):
 
-| Category | Optimal Arm (Ground Truth) | Bandit Selected Arm | Final Arm Pull Rate | Lift vs Static 1-Min Baseline | Recoveries Gained |
+| Category | Optimal Arm (Ground Truth) | Bandit Selected Arm | Final Arm Pull Rate | vs Naive 1-Min Baseline | vs Taxonomy Default Cooldown |
 |---|---|---|---|---|---|
-| `retry_later` (insufficient funds) | **Arm 4 (24 hours)** | **Arm 4 (24 hours)** | **99.9%** | **+412.1%** | +3,111 recoveries |
-| `smart_retry` (gateway latency) | **Arm 1 (15 min)** | **Arm 1 (15 min)** | **99.8%** | **+82.7%** | +1,851 recoveries |
-| `change_method` (expired card) | **Arm 3 (6 hours)** | **Arm 3 (6 hours)** | **98.9%** | **+641.1%** | +3,257 recoveries |
-| `user_error` (wrong CVV/OTP) | **Arm 2 (1 hour)** | **Arm 2 (1 hour)** | **99.9%** | **+202.0%** | +2,464 recoveries |
+| `retry_later` (insufficient funds) | **Arm 4 (24 hours)** | **Arm 4 (24 hours)** | **99.7%** | **+409.7%** | **+-0.9%** (Confirms 24h heuristic) |
+| `smart_retry` (gateway latency) | **Arm 1 (15 min)** | **Arm 1 (15 min)** | **99.7%** | **+77.7%** | **+78.8%** (Beats immediate 1m backoff) |
+| `change_method` (expired card) | **Arm 3 (6 hours)** | **Arm 3 (6 hours)** | **99.6%** | **+619.5%** | *N/A (Taxonomy skips auto-retry)* |
+| `user_error` (wrong CVV/OTP) | **Arm 2 (1 hour)** | **Arm 2 (1 hour)** | **99.8%** | **+205.8%** | *N/A (Taxonomy skips auto-retry)* |
+
+**Fair Comparison Breakdown**:
+1. **Vs. Naive 1-Minute Baseline**: Shows massive lift (+77% to +619%), demonstrating why flat retry timers are disastrous.
+2. **Vs. Taxonomy Hand-Set Heuristic**:
+   - For `retry_later`, the hand-set default was already 24h. The bandit converged to 24h, demonstrating **0% delta** — an honest confirmation that the bandit validates domain expertise rather than artificially beating a straw man.
+   - For `smart_retry`, the hand-set default was 0h (immediate retry). The bandit discovered that a 15-minute delay yields **+78.8% more recoveries** by allowing transient network congestion to clear.
+   - For `change_method` and `user_error`, the taxonomy deliberately sets `auto_retry_allowed=False` (prompting method/re-prompting customer instead). The bandit simulator evaluates optimal timing windows for customer prompts (6h and 1h respectively).
 
 *Generated convergence comparison plot: [`bandit_convergence.png`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/bandit_convergence.png).*
+
+> **Honest Caveat on Bandit Optimization**: The "optimal" arm for each failure category is the maximum reward probability hard-coded into `GROUND_TRUTH_REWARD_DIST` in the simulator environment. The simulation proves that Thompson Sampling successfully explores, exploits, and converges with 99%+ precision to the true underlying peak — not that 24 hours is an empirically proven optimum for real live Razorpay merchant traffic.
 
 ---
 
@@ -159,16 +172,20 @@ A standard pitfall in AI payment hackathons is **"Fake ML"** — training an NLP
 
 Evaluated across **n = 1,200 synthetic records** representing **₹3.76 Crore** at risk:
 
-| Metric | Naive Baseline Policy ($P \ge 0.40$) | Tuned Stopping Rule ($P \ge 0.47$) | Tuned + Uplift Refinement (v2) | Key Impact |
+| Metric | Naive Baseline Policy ($P \ge 0.40$, No Uplift) | Tuned Stopping Rule ($P \ge 0.47$, No Uplift) | Tuned + Uplift Refinement ($P \ge 0.47$, Uplift Gate $\ge 0.05$) | Key Impact |
 |---|---|---|---|---|
-| **Total Amount at Risk** | ₹37,569,620 | ₹37,569,620 | ₹37,569,620 | Schema-accurate batch |
+| **Total Amount at Risk** | ₹37,569,620 | ₹37,569,620 | ₹37,569,620 | Real-schema synthetic batch |
 | **Total Handled Records** | 1,200 | 1,200 | 1,200 | 100% processed with audit log |
-| **Autonomous Retries Attempted** | 783 (65.3%) | 736 (61.3%) | **736 (61.3%)** | Gated, high-confidence attempts |
+| **Autonomous Retries Attempted** | 869 (72.4%) | 783 (65.3%) | **736 (61.3%)** | Gated, high-confidence attempts |
 | **Skipped Low-Uplift (Self-Recovery)** | 0 (0.0%) | 0 (0.0%) | **47 (3.9%)** | **47 wasted notifications eliminated** |
-| **Escalated to Human Review** | 417 (34.7%) | 464 (38.7%) | **417 (34.7%)** | Risk & compliance stops intact |
-| **Total Amount Recovered** | ₹14,891,400 | ₹14,195,147 | **₹14,195,147** | High-confidence recoveries |
-| **Wasted Spend on Failed Retries** | ₹7,210,500 | ₹6,099,284 | **₹6,099,284** | **-15.4% reduction in wasted spend** |
-| **Recovery Rate *of Attempted Cases*** | 67.30% | 69.95% | **69.95%** | **High precision on merchant actions** |
+| **Escalated to Human Review** | 331 (27.6%) | 417 (34.7%) | **417 (34.7%)** | Risk & compliance stops intact |
+| **Total Amount Recovered** | ₹15,145,945 | ₹14,588,655 | **₹14,195,147** | Realized high-confidence recoveries |
+| **Wasted Spend on Failed Retries** | ₹8,687,605 | ₹6,461,592 | **₹6,099,284** | **-29.8% reduction in wasted spend** (-₹2.59M vs Naive) |
+| **Wasted Spend Reduction from Uplift Alone** | — | — | **-₹362,308 (-5.61%)** | Attributable specifically to causal filter |
+| **Recovery Rate *of Attempted Cases*** | 63.55% | 69.30% | **69.95%** | **+6.4pp precision on customer touchpoints** |
+
+### Verified Invariant:
+$$\text{Attempted (736)} + \text{Escalated (417)} + \text{Skipped Low-Uplift (47)} = \mathbf{1200} \text{ total records}$$
 
 ---
 
@@ -286,7 +303,7 @@ python agent/retry_bandit.py 5000
 # 5. Run Strategic Cohort Analyst (Generates cohort_scatter.png & cohort_report.txt)
 python agent/cohort_analyst.py
 
-# 6. Run Batch Orchestrator over Full Dataset
+# 6. Run Batch Orchestrator over Full Dataset (Prints uplift-attributable delta)
 python agent/orchestrator.py data/synthetic_failed_payments.json
 ```
 
@@ -299,7 +316,7 @@ python agent/orchestrator.py data/synthetic_failed_payments.json
    - *Fix*: Razorpay webhooks already provide `error_reason` cleanly. We focused ML on genuine unknowns: $P(\text{Success} \mid \text{Context})$, Causal Uplift, Dynamic Delay Bandits, and Macro Outages.
 2. **The Causal Self-Recovery Trap**:
    - *Problem*: Success predictors take credit for organic self-recoveries (e.g. customer immediate retries).
-   - *Fix*: Added a T-Learner uplift refinement layer ($\mu_1 - \mu_0$) with a $>0.05$ uplift gate, eliminating 47 unnecessary notifications.
+   - *Fix*: Added a T-Learner uplift refinement layer ($\mu_1 - \mu_0$) with a $\ge 0.05$ uplift gate, eliminating 47 unnecessary notifications and saving ₹362,308 in wasted retry spend.
 3. **The Systemic Outage Blindspot**:
    - *Problem*: When an entire issuer bank goes down, transaction-level retries keep burning attempts fruitlessly.
    - *Fix*: Created the Degradation Agent with a seasonal $3.0\sigma$ Z-score alert engine that catches 100% of outages and surfaces real-time ₹ impact.

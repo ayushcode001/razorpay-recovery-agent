@@ -88,12 +88,29 @@ def run_batch(data_path: str, use_uplift: bool = True):
         audit.log(record, decision, outcome)
 
     audit.save()
-    return audit.summary(), ml_metrics, exceptions, uplift_metrics
+    summary = audit.summary()
+
+    # Invariant: Every record must be classified as attempted, escalated, or skipped_low_uplift
+    assert (
+        summary["attempted"] + summary["escalated_to_human"] + summary["skipped_low_uplift"]
+        == summary["total_records"]
+    ), (
+        f"Invariant violation: {summary['attempted']} (attempted) + "
+        f"{summary['escalated_to_human']} (escalated) + {summary['skipped_low_uplift']} (skipped) "
+        f"!= {summary['total_records']} (total)"
+    )
+
+    return summary, ml_metrics, exceptions, uplift_metrics
 
 
 if __name__ == "__main__":
     data_path = sys.argv[1] if len(sys.argv) > 1 else os.path.join(PROJECT_ROOT, "data", "synthetic_failed_payments.json")
-    summary, ml_metrics, exceptions, uplift_metrics = run_batch(data_path)
+    
+    # 1. Run WITH uplift refinement
+    summary, ml_metrics, exceptions, uplift_metrics = run_batch(data_path, use_uplift=True)
+
+    # 2. Run WITHOUT uplift refinement to quantify the exact uplift-attributable delta
+    summary_no_uplift, _, _, _ = run_batch(data_path, use_uplift=False)
 
     print("=== BATCH RUN SUMMARY (Tuned Policy + Uplift Refinement) ===")
     for k, v in summary.items():
@@ -104,9 +121,17 @@ if __name__ == "__main__":
         else:
             print(f"  {k}: {v}")
 
+    print("\n=== UPLIFT ATTRIBUTABLE DELTA (With vs Without Uplift Gate) ===")
+    diff_attempted = summary_no_uplift["attempted"] - summary["attempted"]
+    diff_wasted = summary_no_uplift["amount_wasted_on_failed_attempts"] - summary["amount_wasted_on_failed_attempts"]
+    print(f"  Attempts diverted to skipped_low_uplift: {diff_attempted} records")
+    print(f"  Wasted spend eliminated: Rs.{diff_wasted:,} ({diff_wasted / summary_no_uplift['amount_wasted_on_failed_attempts']:.2%} reduction)")
+    print(f"  Precision on attempted cases: {summary_no_uplift['recovery_rate_of_attempted']:.2%} -> {summary['recovery_rate_of_attempted']:.2%}")
+
     if uplift_metrics:
         print(f"\n=== UPLIFT MODEL (Causal T-Learner) ===")
-        print(f"  Correlation with Ground-Truth Uplift: {uplift_metrics['pearson_correlation']:.4f}")
+        print(f"  Correlation with Ground-Truth Uplift: {uplift_metrics['pearson_correlation']:.4f} (p={uplift_metrics['p_value']:.2e})")
+        print(f"  Estimated Mean Uplift: +{uplift_metrics['overall_mean_pred_uplift']:.2%} vs True Mean Uplift: +{uplift_metrics['overall_mean_true_uplift']:.2%}")
         print(f"  Cases Filtered (Likely Self-Recovery): {summary['skipped_low_uplift']} transactions")
 
     print(f"\n=== EXCEPTIONS (could not resolve): {len(exceptions)} of {summary['total_records']} ===")
@@ -118,3 +143,4 @@ if __name__ == "__main__":
         print(f"  ... and {len(exceptions) - 5} more (see audit_logs/audit_trail.json)")
 
     print(f"\nFull audit trail written to audit_logs/audit_trail.json")
+

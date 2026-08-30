@@ -24,8 +24,10 @@ def get_success_prob_threshold() -> float:
             pass
     return 0.40
 
-SUCCESS_PROB_THRESHOLD = get_success_prob_threshold()  # below this, don't burn an attempt -- escalate instead
+# Threshold source of truth: threshold_config.json (tuned to 0.47 via 5-seed cross-validation)
+SUCCESS_PROB_THRESHOLD = get_success_prob_threshold()  # below this (0.47), don't burn an attempt -- escalate instead
 UPLIFT_THRESHOLD = 0.05  # below this, intervention adds negligible causal lift; skip to avoid wasted cost
+
 
 
 def decide_action(record: dict, predicted_success_prob: float, estimated_uplift: float | None = None) -> dict:

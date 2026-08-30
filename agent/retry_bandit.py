@@ -86,6 +86,17 @@ OPTIMAL_ARM_INDEX = {
     "user_error": 2,    # 1h
 }
 
+# Taxonomy's hand-set default cooldowns from agent/taxonomy.py
+# retry_later: 24 hours (Arm 4)
+# smart_retry: 0 hours / backoff in minutes (Arm 0)
+# change_method / user_error: auto_retry_allowed is False in taxonomy (prompt/reprompt actions)
+TAXONOMY_DEFAULT_ARM = {
+    "retry_later": 4,      # 24 hours
+    "smart_retry": 0,      # 1 min / immediate
+    "change_method": None, # N/A (taxonomy forbids auto-retry; requires method swap)
+    "user_error": None,    # N/A (taxonomy forbids auto-retry; requires customer reprompt)
+}
+
 
 class ThompsonSamplingBandit:
     """
@@ -133,16 +144,18 @@ def run_bandit_simulation(n_episodes: int = 5000, seed: int = 42):
         
         # Baselines for comparison:
         # Baseline 1: Fixed naive 1-minute immediate cooldown (Arm 0)
-        # Baseline 2: Random arm selection
-        baseline_fixed_rewards = []
-        baseline_random_rewards = []
-
+        # Baseline 2: Taxonomy hand-set default (from agent/taxonomy.py)
+        # Baseline 3: Random arm selection
+        tax_arm = TAXONOMY_DEFAULT_ARM[category]
+        
         bandit_cum_rewards = []
         fixed_cum_rewards = []
+        taxonomy_cum_rewards = []
         random_cum_rewards = []
 
         bandit_cum = 0
         fixed_cum = 0
+        tax_cum = 0
         random_cum = 0
 
         for ep in range(n_episodes):
@@ -153,12 +166,18 @@ def run_bandit_simulation(n_episodes: int = 5000, seed: int = 42):
             bandit_cum += reward
             bandit_cum_rewards.append(bandit_cum)
 
-            # 2. Fixed baseline (always Arm 0: 1 min)
+            # 2. Fixed naive baseline (always Arm 0: 1 min)
             fixed_reward = simulate_environment_reward(category, 0)
             fixed_cum += fixed_reward
             fixed_cum_rewards.append(fixed_cum)
 
-            # 3. Random baseline
+            # 3. Taxonomy default baseline (if applicable)
+            if tax_arm is not None:
+                tax_reward = simulate_environment_reward(category, tax_arm)
+                tax_cum += tax_reward
+                taxonomy_cum_rewards.append(tax_cum)
+
+            # 4. Random baseline
             rand_arm = np.random.choice(len(ARMS))
             rand_reward = simulate_environment_reward(category, rand_arm)
             random_cum += rand_reward
@@ -171,16 +190,23 @@ def run_bandit_simulation(n_episodes: int = 5000, seed: int = 42):
         converged = (most_chosen_arm == optimal_arm)
         optimal_pull_rate = (np.array(last_1000_arms) == optimal_arm).mean()
 
+        lift_vs_fixed = ((bandit_cum - fixed_cum) / fixed_cum) if fixed_cum else 0
+        lift_vs_taxonomy = ((bandit_cum - tax_cum) / tax_cum) if (tax_arm is not None and tax_cum) else None
+
         results[category] = {
             "bandit": bandit,
             "bandit_cum_rewards": bandit_cum_rewards,
             "fixed_cum_rewards": fixed_cum_rewards,
+            "taxonomy_cum_rewards": taxonomy_cum_rewards if tax_arm is not None else None,
             "random_cum_rewards": random_cum_rewards,
             "total_bandit_recoveries": bandit_cum,
             "total_fixed_recoveries": fixed_cum,
+            "total_taxonomy_recoveries": tax_cum if tax_arm is not None else None,
             "total_random_recoveries": random_cum,
             "net_gain_over_fixed": bandit_cum - fixed_cum,
-            "percentage_gain": ((bandit_cum - fixed_cum) / fixed_cum) if fixed_cum else 0,
+            "percentage_gain_vs_fixed": lift_vs_fixed,
+            "percentage_gain_vs_taxonomy": lift_vs_taxonomy,
+            "taxonomy_default_arm": tax_arm,
             "optimal_arm": optimal_arm,
             "most_chosen_arm": most_chosen_arm,
             "converged": converged,
@@ -219,6 +245,9 @@ def plot_bandit_results(results: dict, out_path: str = OUTPUT_CHART_PATH):
 
         ax.plot(episodes, data["bandit_cum_rewards"], label="Thompson Sampling Bandit", color=palette[category], linewidth=2.4)
         ax.plot(episodes, data["fixed_cum_rewards"], label="Fixed Cooldown Baseline (1m)", color="#94a3b8", linestyle="--", linewidth=1.8)
+        if data["taxonomy_cum_rewards"] is not None:
+            tax_name = ARMS[data["taxonomy_default_arm"]]["name"]
+            ax.plot(episodes, data["taxonomy_cum_rewards"], label=f"Taxonomy Default ({tax_name})", color="#38bdf8", linestyle="-.", linewidth=1.6)
         ax.plot(episodes, data["random_cum_rewards"], label="Random Policy Baseline", color="#64748b", linestyle=":", linewidth=1.4)
 
         opt_name = ARMS[data["optimal_arm"]]["name"]
@@ -229,11 +258,13 @@ def plot_bandit_results(results: dict, out_path: str = OUTPUT_CHART_PATH):
         ax.legend(loc="upper left", fontsize=8, framealpha=0.3)
 
         # Annotate final outcome
-        gain = data["percentage_gain"]
+        gain_fixed = data["percentage_gain_vs_fixed"]
+        tax_gain = data["percentage_gain_vs_taxonomy"]
+        tax_str = f"\nLift vs Taxonomy ({ARMS[data['taxonomy_default_arm']]['name']}): +{tax_gain:.1%}" if tax_gain is not None else "\nTaxonomy: No auto-retry"
         final_rate = data["final_optimal_pull_rate"]
         ax.text(
             0.97, 0.08,
-            f"Converged to: {opt_name}\nOptimal arm pick rate: {final_rate:.1%}\nLift vs Fixed: +{gain:.1%}",
+            f"Converged to: {opt_name}\nOptimal arm pick rate: {final_rate:.1%}\nLift vs 1m: +{gain_fixed:.1%}{tax_str}",
             transform=ax.transAxes,
             fontsize=8,
             ha="right",
@@ -255,7 +286,7 @@ if __name__ == "__main__":
     results = run_bandit_simulation(n_episodes=n_episodes)
 
     print("\n=== BANDIT SIMULATION SUMMARY (5,000 Episodes per Category) ===")
-    print(f"{'Category':<16} {'Optimal Arm':<14} {'Selected Arm':<14} {'Final Pull Rate':<18} {'Lift vs Fixed Baseline':<20}")
+    print(f"{'Category':<16} {'Optimal Arm':<14} {'Selected Arm':<14} {'Final Pull Rate':<16} {'vs 1m Baseline':<16} {'vs Taxonomy Default':<22}")
     
     all_converged = True
     for cat in CATEGORIES:
@@ -263,10 +294,18 @@ if __name__ == "__main__":
         opt_str = f"Arm {r['optimal_arm']} ({ARMS[r['optimal_arm']]['name']})"
         sel_str = f"Arm {r['most_chosen_arm']} ({ARMS[r['most_chosen_arm']]['name']})"
         pull_str = f"{r['final_optimal_pull_rate']:.1%}"
-        lift_str = f"+{r['percentage_gain']:.1%} (+{r['net_gain_over_fixed']} recoveries)"
-        print(f"{cat:<16} {opt_str:<14} {sel_str:<14} {pull_str:<18} {lift_str:<20}")
+        lift_1m_str = f"+{r['percentage_gain_vs_fixed']:.1%}"
+        
+        if r["percentage_gain_vs_taxonomy"] is not None:
+            tax_name = ARMS[r["taxonomy_default_arm"]]["name"]
+            lift_tax_str = f"+{r['percentage_gain_vs_taxonomy']:.1%} (Arm {r['taxonomy_default_arm']} / {tax_name})"
+        else:
+            lift_tax_str = "N/A (Taxonomy skips auto-retry)"
+
+        print(f"{cat:<16} {opt_str:<14} {sel_str:<14} {pull_str:<16} {lift_1m_str:<16} {lift_tax_str:<22}")
         if not r["converged"]:
             all_converged = False
 
     print(f"\nGround Truth Convergence Verification: {'PASSED (100% categories converged to true optimal timing)' if all_converged else 'FAILED'}")
     plot_bandit_results(results)
+
