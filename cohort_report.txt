@@ -1,0 +1,58 @@
+========================================================================================
+       RAZORPAY RECOVERY AGENT - COHORT ANALYST STRATEGIC REPORT
+       Unsupervised Latent Clustering & Recoverable Opportunity Ranking
+========================================================================================
+Total Transactions Evaluated: 1,200 | Total Amount at Risk: Rs.37,569,620
+PCA 2D Latent Variance Retained: 40.5%
+Non-Triviality Verification: 5 of 5 clusters cross taxonomy boundaries (PASSED)
+----------------------------------------------------------------------------------------
+Rank  Discovered Archetype / Cohort          Size     At Risk (INR)    Cur Rec%   Est Recoverable (INR)
+----------------------------------------------------------------------------------------
+#1    High-Ticket Enterprise (UPI) - First-Attempt Drop 227      Rs.  22,725,592    53.3%   Rs.     7,203,111
+#2    High-Ticket Enterprise (CARD) - Repeated Retry Fatigue 71       Rs.   7,066,674    46.5%   Rs.     2,722,162
+#3    Mid-Market (UPI) - First-Attempt Drop  419      Rs.   5,773,071    59.0%   Rs.     1,503,891
+#4    Mid-Market (UPI) - Repeated Retry Fatigue 181      Rs.   1,084,358    48.1%   Rs.       400,493
+#5    Mid-Market (CARD) - First-Attempt Drop 302      Rs.     919,925    55.3%   Rs.       273,236
+----------------------------------------------------------------------------------------
+
+=== DEEP DIVE PER DISCOVERED COHORT ===
+
+[Cohort #1] High-Ticket Enterprise (UPI) - First-Attempt Drop
+  - Financial Scope: Rs.22,725,592 (60.5% of total at risk across 227 payments)
+  - Average Ticket Size: Rs.100,112 | Prior Retries: 0.3 | Typical Hour: 12:00
+  - Current Recovery Rate: 53.3% -> Recoverable Opportunity: Rs.7,203,111
+  - Dominant Categories: smart_retry (39%), retry_later (35%)
+  - Dominant Channels:   upi (51%), card (37%)
+  - Failure Sources:     gateway (28%), razorpay (26%)
+
+[Cohort #2] High-Ticket Enterprise (CARD) - Repeated Retry Fatigue
+  - Financial Scope: Rs.7,066,674 (18.8% of total at risk across 71 payments)
+  - Average Ticket Size: Rs.99,530 | Prior Retries: 2.11 | Typical Hour: 6:00
+  - Current Recovery Rate: 46.5% -> Recoverable Opportunity: Rs.2,722,162
+  - Dominant Categories: smart_retry (46%), retry_later (28%)
+  - Dominant Channels:   card (51%), upi (41%)
+  - Failure Sources:     gateway (32%), razorpay (25%)
+
+[Cohort #3] Mid-Market (UPI) - First-Attempt Drop
+  - Financial Scope: Rs.5,773,071 (15.4% of total at risk across 419 payments)
+  - Average Ticket Size: Rs.13,778 | Prior Retries: 0.63 | Typical Hour: 11:00
+  - Current Recovery Rate: 59.0% -> Recoverable Opportunity: Rs.1,503,891
+  - Dominant Categories: smart_retry (40%), retry_later (34%)
+  - Dominant Channels:   upi (44%), card (40%)
+  - Failure Sources:     razorpay (27%), gateway (27%)
+
+[Cohort #4] Mid-Market (UPI) - Repeated Retry Fatigue
+  - Financial Scope: Rs.1,084,358 (2.9% of total at risk across 181 payments)
+  - Average Ticket Size: Rs.5,990 | Prior Retries: 2.38 | Typical Hour: 11:00
+  - Current Recovery Rate: 48.1% -> Recoverable Opportunity: Rs.400,493
+  - Dominant Categories: smart_retry (43%), retry_later (26%)
+  - Dominant Channels:   upi (46%), card (43%)
+  - Failure Sources:     issuer (26%), razorpay (25%)
+
+[Cohort #5] Mid-Market (CARD) - First-Attempt Drop
+  - Financial Scope: Rs.919,925 (2.5% of total at risk across 302 payments)
+  - Average Ticket Size: Rs.3,046 | Prior Retries: 0.0 | Typical Hour: 15:00
+  - Current Recovery Rate: 55.3% -> Recoverable Opportunity: Rs.273,236
+  - Dominant Categories: smart_retry (38%), retry_later (28%)
+  - Dominant Channels:   card (48%), upi (41%)
+  - Failure Sources:     issuer (28%), gateway (26%)
