@@ -26,6 +26,7 @@ class AuditTrail:
             "action": decision["action"],
             "attempted": decision["attempted"],
             "predicted_success_prob": round(decision["predicted_success_prob"], 3),
+            "estimated_uplift": round(decision["estimated_uplift"], 3) if decision.get("estimated_uplift") is not None else None,
             "reason": decision["reason"],
             "outcome": outcome,  # filled in after the (simulated/real) attempt resolves
         }
@@ -42,7 +43,8 @@ class AuditTrail:
     def summary(self):
         total = len(self.entries)
         attempted = sum(1 for e in self.entries if e["attempted"])
-        escalated = total - attempted
+        skipped_low_uplift = sum(1 for e in self.entries if e["action"] == "skipped_low_uplift")
+        escalated = sum(1 for e in self.entries if not e["attempted"] and e["action"] != "skipped_low_uplift")
         recovered_amount = sum(
             e["amount"] for e in self.entries
             if e["attempted"] and isinstance(e.get("outcome"), dict) and e["outcome"].get("succeeded") is True
@@ -56,6 +58,7 @@ class AuditTrail:
         return {
             "total_records": total,
             "attempted": attempted,
+            "skipped_low_uplift": skipped_low_uplift,
             "escalated_to_human": escalated,
             "amount_at_risk": at_risk_amount,
             "amount_recovered": recovered_amount,

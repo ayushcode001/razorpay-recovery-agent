@@ -73,6 +73,9 @@ def test_api_audit_trail():
         data = json.loads(response.read().decode("utf-8"))
         print(f"  [OK] Total records in audit: {data['summary']['total_records']}")
         print(f"  [OK] Amount recovered: Rs.{data['summary']['amount_recovered']:,}")
+        assert "skipped_low_uplift" in data["summary"]
+        assert "attempted" in data["summary"]
+        print("  [OK] Audit trail summary schema verified with uplift tracking")
 
 
 if __name__ == "__main__":

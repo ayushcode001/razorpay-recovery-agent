@@ -67,6 +67,15 @@ BASE_SUCCESS_PROB = {
     "user_error": 0.65,      # re-prompting usually fixes it
 }
 
+# Base self-recovery probability WITHOUT any intervention (control arm baseline)
+BASE_SELF_RECOVERY_PROB = {
+    "smart_retry": 0.30,     # transient -- customer's own retry might just work
+    "retry_later": 0.10,     # needs funds to appear; low self-recovery
+    "change_method": 0.08,   # needs nudge to switch; low self-recovery
+    "escalate": 0.02,        # near-zero; risk/compliance rarely self-resolve
+    "user_error": 0.15,      # customer may retry with correct details
+}
+
 
 def _rand_id(prefix):
     return prefix + "_" + "".join(random.choices(string.ascii_letters + string.digits, k=14))
@@ -94,6 +103,19 @@ def simulate_outcome(category, amount, retry_count, hour_of_day):
     return 1 if random.random() < p else 0
 
 
+def simulate_self_recovery(category, amount, retry_count, hour_of_day):
+    """Ground-truth baseline self-recovery probability without intervention."""
+    p0 = BASE_SELF_RECOVERY_PROB[category]
+    if amount > 50000:
+        p0 -= 0.03
+    if retry_count >= 2:
+        p0 -= 0.04
+    if hour_of_day < 6 or hour_of_day > 23:
+        p0 -= 0.02
+    p0 = max(0.01, min(0.50, p0))
+    return round(p0, 4)
+
+
 def generate_record(base_time):
     error_code = weighted_error_code()
     category = category_for(error_code)
@@ -109,6 +131,16 @@ def generate_record(base_time):
     retry_count = random.choices([0, 1, 2, 3], weights=[55, 25, 12, 8], k=1)[0]
     created_at = base_time - timedelta(minutes=random.randint(0, 60 * 24 * 14))
     hour_of_day = created_at.hour
+
+    recovery_succeeded = simulate_outcome(category, amount, retry_count, hour_of_day)
+    p0 = simulate_self_recovery(category, amount, retry_count, hour_of_day)
+    
+    # 50/50 randomized experiment assignment for T-learner uplift modeling
+    treatment = 1 if random.random() < 0.5 else 0
+    if treatment == 1:
+        observed_outcome = recovery_succeeded
+    else:
+        observed_outcome = 1 if random.random() < p0 else 0
 
     record = {
         "id": _rand_id("pay"),
@@ -133,7 +165,10 @@ def generate_record(base_time):
         # ground truth label for training / eval -- would come from real retry
         # outcomes in production, simulated here:
         "recovery_attempted": True,
-        "recovery_succeeded": simulate_outcome(category, amount, retry_count, hour_of_day),
+        "recovery_succeeded": recovery_succeeded,
+        "p0_self_recovery": p0,
+        "treatment": treatment,
+        "observed_outcome": observed_outcome,
         "_category": category,  # kept for eval convenience, not a model input
     }
     return record
@@ -147,7 +182,8 @@ def generate_dataset(n=250):
 if __name__ == "__main__":
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 250
     dataset = generate_dataset(n)
-    out_path = "synthetic_failed_payments.json"
+    out_path = sys.argv[2] if len(sys.argv) > 2 else os.path.join(PROJECT_ROOT, "data", "synthetic_failed_payments.json")
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     with open(out_path, "w") as f:
         json.dump(dataset, f, indent=2)
     print(f"Generated {n} records -> {out_path}")
