@@ -21,8 +21,12 @@ load_dotenv()
 
 from agent.copilot_context import build_context, load_audit_trail
 
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
-GEMINI_API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+CANDIDATE_MODELS = [
+    os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
+    "gemini-flash-latest",
+    "gemini-3.6-flash",
+    "gemini-3.7-flash",
+]
 
 SYSTEM_PROMPT = """You explain decisions made by an autonomous payment recovery agent, using ONLY the JSON context provided below. Never state a number, count, or fact that isn't present in the context. If the question asks about something not covered by the context, say so plainly rather than guessing. You cannot take any action — you can only explain past decisions. If asked to perform an action (approve, retry, refund, change a setting), decline and explain that you're a read-only explanation layer. Always respond in English only, regardless of the language of the question or any names, terms, or values in the data."""
 
@@ -57,7 +61,6 @@ def answer_question(question: str, df: Optional[pd.DataFrame] = None) -> Dict[st
         }
 
     # 2. Build LLM prompt with strict isolation
-    # Minimize noise by formatting JSON context cleanly
     prompt_text = (
         f"{SYSTEM_PROMPT}\n\n"
         f"--- GROUNDED AUDIT CONTEXT (JSON) ---\n"
@@ -86,39 +89,36 @@ def answer_question(question: str, df: Optional[pd.DataFrame] = None) -> Dict[st
         "x-goog-api-key": api_key,
     }
 
-    try:
-        response = requests.post(
-            GEMINI_API_URL,
-            headers=headers,
-            json=payload,
-            timeout=15,
-        )
-        if response.status_code != 200:
-            return {
-                "answer": f"Gemini API returned status code {response.status_code}: {response.text}",
-                "grounded_record_count": context.get("grounded_record_count", 0),
-                "context_used": context,
-            }
+    last_error = ""
+    for model_name in CANDIDATE_MODELS:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=15)
+            if response.status_code == 200:
+                res_data = response.json()
+                candidates = res_data.get("candidates", [])
+                if candidates and "content" in candidates[0] and "parts" in candidates[0]["content"]:
+                    generated_text = candidates[0]["content"]["parts"][0].get("text", "").strip()
+                    return {
+                        "answer": generated_text,
+                        "grounded_record_count": context.get("grounded_record_count", 0),
+                        "context_used": context,
+                        "model_used": model_name,
+                    }
+            elif response.status_code in (429, 503, 404):
+                last_error = f"Model {model_name} returned status {response.status_code}"
+                continue
+            else:
+                last_error = f"Gemini API returned status code {response.status_code}: {response.text}"
+        except Exception as e:
+            last_error = str(e)
+            continue
 
-        res_data = response.json()
-        candidates = res_data.get("candidates", [])
-        if candidates and "content" in candidates[0] and "parts" in candidates[0]["content"]:
-            generated_text = candidates[0]["content"]["parts"][0].get("text", "").strip()
-        else:
-            generated_text = "No explanation could be generated from the given context."
-
-        return {
-            "answer": generated_text,
-            "grounded_record_count": context.get("grounded_record_count", 0),
-            "context_used": context,
-        }
-
-    except Exception as e:
-        return {
-            "answer": f"Error contacting explanation engine: {str(e)}",
-            "grounded_record_count": context.get("grounded_record_count", 0),
-            "context_used": context,
-        }
+    return {
+        "answer": f"Error contacting explanation engine ({last_error}).",
+        "grounded_record_count": context.get("grounded_record_count", 0),
+        "context_used": context,
+    }
 
 
 if __name__ == "__main__":

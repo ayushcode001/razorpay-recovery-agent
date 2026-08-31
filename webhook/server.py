@@ -36,6 +36,8 @@ from webhook.razorpay_client import (
 )
 from webhook.notifier import send_recovery_notification
 from agent.copilot import answer_question
+from agent.drift_check import load_proposals, evaluate_drift, PROPOSALS_LOG_PATH, CONFIG_PATH
+from agent.policy_engine import get_success_prob_threshold
 
 load_dotenv()
 
@@ -86,6 +88,12 @@ def dashboard():
         degradation_incidents = deg_res.get("incidents", [])[:4]
     except Exception as e:
         print(f"[Server] Degradation monitoring warning: {e}")
+
+    # Load policy proposals for drift-check governance
+    proposals = load_proposals()
+    pending_proposals = [p for p in proposals if p.get("status") == "pending_human_approval"]
+    latest_proposal = pending_proposals[-1] if pending_proposals else (proposals[-1] if proposals else None)
+    current_threshold = get_success_prob_threshold()
 
     html = """
     <!DOCTYPE html>
@@ -456,6 +464,107 @@ def dashboard():
                 font-size: 11px;
                 color: #93c5fd;
             }
+
+            /* Drift Governance Panel */
+            .drift-panel {
+                background: rgba(239, 68, 68, 0.04);
+                border: 1px solid rgba(239, 68, 68, 0.3);
+                border-radius: 12px;
+                padding: 18px 20px;
+                margin-bottom: 24px;
+            }
+            .drift-panel-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 12px;
+            }
+            .drift-panel-header h3 {
+                margin: 0;
+                font-size: 15px;
+                font-weight: 700;
+                color: #f87171;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+            .drift-status-badge {
+                font-size: 11px;
+                font-weight: 600;
+                padding: 4px 10px;
+                border-radius: 9999px;
+            }
+            .drift-badge-pending {
+                background: rgba(245, 158, 11, 0.15);
+                color: #fbbf24;
+                border: 1px solid rgba(245, 158, 11, 0.4);
+            }
+            .drift-badge-approved {
+                background: rgba(16, 185, 129, 0.15);
+                color: #34d399;
+                border: 1px solid rgba(16, 185, 129, 0.4);
+            }
+            .drift-badge-rejected {
+                background: rgba(239, 68, 68, 0.15);
+                color: #f87171;
+                border: 1px solid rgba(239, 68, 68, 0.4);
+            }
+            .drift-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                gap: 12px;
+                margin-bottom: 14px;
+            }
+            .drift-metric-box {
+                background: #0e1526;
+                border: 1px solid #1f2d48;
+                border-radius: 8px;
+                padding: 10px 14px;
+            }
+            .drift-metric-lbl {
+                font-size: 11px;
+                color: #94a3b8;
+                margin-bottom: 4px;
+            }
+            .drift-metric-val {
+                font-size: 16px;
+                font-weight: 700;
+                font-family: 'JetBrains Mono', monospace;
+            }
+            .btn-action-group {
+                display: flex;
+                gap: 10px;
+                align-items: center;
+            }
+            .btn-approve {
+                background: linear-gradient(135deg, #10b981, #059669);
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                border-radius: 6px;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .btn-approve:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            }
+            .btn-reject {
+                background: rgba(239, 68, 68, 0.1);
+                color: #f87171;
+                border: 1px solid rgba(239, 68, 68, 0.4);
+                padding: 8px 14px;
+                border-radius: 6px;
+                font-size: 13px;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .btn-reject:hover {
+                background: rgba(239, 68, 68, 0.2);
+            }
         </style>
     </head>
     <body>
@@ -516,6 +625,73 @@ def dashboard():
                         </div>
                     </div>
                     {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if latest_proposal %}
+            <div class="drift-panel" id="drift-panel-container">
+                <div class="drift-panel-header">
+                    <h3>🛡️ Drift-Check Agent (Recovery Ops Governance)</h3>
+                    <div>
+                        {% if latest_proposal.status == 'pending_human_approval' %}
+                            <span class="drift-status-badge drift-badge-pending">⏳ PENDING HUMAN APPROVAL</span>
+                        {% elif latest_proposal.status == 'approved' %}
+                            <span class="drift-status-badge drift-badge-approved">✅ POLICY APPROVED & ACTIVE</span>
+                        {% else %}
+                            <span class="drift-status-badge drift-badge-rejected">❌ POLICY REJECTED</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <p style="margin: 0 0 12px 0; font-size: 13px; color: #cbd5e1;">
+                    Evaluated on <b>{{ latest_proposal.evaluated_on }}</b> (n={{ "{:,}".format(latest_proposal.dataset_size) }} records, ₹{{ "{:,}".format(latest_proposal.amount_at_risk) }} at risk).
+                    {% if latest_proposal.drift_detected %}
+                    Detected <span style="color: #f87171; font-weight: 700;">{{ "{:+.1f}".format(latest_proposal.accuracy_delta_pp) }}pp accuracy degradation</span> on fresh distribution.
+                    {% else %}
+                    Model performance is stable within calibrated bounds.
+                    {% endif %}
+                </p>
+
+                <div class="drift-grid">
+                    <div class="drift-metric-box">
+                        <div class="drift-metric-lbl">Success Predictor Accuracy</div>
+                        <div class="drift-metric-val" style="color: #f87171;">
+                            {{ "{:.1%}".format(latest_proposal.original_performance.accuracy) }} → {{ "{:.1%}".format(latest_proposal.drift_batch_performance.accuracy) }}
+                        </div>
+                    </div>
+                    <div class="drift-metric-box">
+                        <div class="drift-metric-lbl">Threshold Recommendation</div>
+                        <div class="drift-metric-val" style="color: #60a5fa;">
+                            {{ "{:.2f}".format(latest_proposal.current_threshold) }} → {{ "{:.2f}".format(latest_proposal.proposed_threshold) }}
+                        </div>
+                    </div>
+                    <div class="drift-metric-box">
+                        <div class="drift-metric-lbl">Est. Net INR Gain</div>
+                        <div class="drift-metric-val" style="color: #34d399;">
+                            +₹{{ "{:,}".format(latest_proposal.estimated_net_value_gain) }}
+                        </div>
+                    </div>
+                    <div class="drift-metric-box">
+                        <div class="drift-metric-lbl">Attempt Precision Lift</div>
+                        <div class="drift-metric-val" style="color: #fbbf24;">
+                            {{ "{:.1%}".format(latest_proposal.recovery_rate_current) }} → {{ "{:.1%}".format(latest_proposal.recovery_rate_proposed) }}
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 12px;">
+                    <span style="font-size: 12px; color: var(--text-muted);">
+                        <b>Human-in-the-Loop Guarantee:</b> Policy changes are NEVER auto-applied to production.
+                    </span>
+                    {% if latest_proposal.status == 'pending_human_approval' %}
+                    <div class="btn-action-group" id="proposal-actions">
+                        <button class="btn-approve" onclick="resolveProposal('{{ latest_proposal.proposal_id }}', 'approve')">✓ Approve Policy Update</button>
+                        <button class="btn-reject" onclick="resolveProposal('{{ latest_proposal.proposal_id }}', 'reject')">✕ Reject</button>
+                    </div>
+                    {% else %}
+                    <span style="font-size: 12px; color: #94a3b8;">Proposal resolved ({{ latest_proposal.status }}).</span>
+                    {% endif %}
                 </div>
             </div>
             {% endif %}
@@ -671,11 +847,43 @@ def dashboard():
                 const viewer = document.getElementById('copilot-json-viewer');
                 viewer.style.display = viewer.style.display === 'block' ? 'none' : 'block';
             }
+
+            async function resolveProposal(proposalId, action) {
+                const actionsContainer = document.getElementById('proposal-actions');
+                if (actionsContainer) {
+                    actionsContainer.innerHTML = '<span style="color: #94a3b8; font-size: 12px;">Submitting governance decision...</span>';
+                }
+                try {
+                    const res = await fetch(`/api/policy-proposals/${proposalId}/${action}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    const data = await res.json();
+                    if (data.status === 'approved') {
+                        alert(`Policy change approved! Optimal threshold updated to ${data.new_threshold}.`);
+                        window.location.reload();
+                    } else if (data.status === 'rejected') {
+                        alert('Policy proposal rejected. Current threshold maintained.');
+                        window.location.reload();
+                    } else {
+                        alert('Response: ' + JSON.stringify(data));
+                        window.location.reload();
+                    }
+                } catch (err) {
+                    alert('Error submitting governance decision: ' + err);
+                }
+            }
         </script>
     </body>
     </html>
     """
-    return render_template_string(html, summary=summary, recent_entries=recent_entries)
+    return render_template_string(
+        html,
+        summary=summary,
+        recent_entries=recent_entries,
+        latest_proposal=latest_proposal,
+        current_threshold=current_threshold,
+    )
 
 
 @app.route("/checkout", methods=["GET"])
@@ -1002,6 +1210,89 @@ def api_copilot():
     df_context = pd.DataFrame(audit_trail.entries) if audit_trail.entries else None
     result = answer_question(question, df=df_context)
     return jsonify(result), 200
+
+
+@app.route("/api/policy-proposals", methods=["GET"])
+def api_policy_proposals():
+    """Returns list of all policy change proposals generated by Drift-Check agent."""
+    proposals = load_proposals()
+    return jsonify({
+        "proposals": proposals,
+        "current_threshold": get_success_prob_threshold(),
+    }), 200
+
+
+@app.route("/api/policy-proposals/<proposal_id>/approve", methods=["POST"])
+def api_approve_proposal(proposal_id):
+    """Human-in-the-loop: Approves a proposed policy change and updates threshold_config.json."""
+    proposals = load_proposals()
+    target = None
+    for p in proposals:
+        if p.get("proposal_id") == proposal_id:
+            target = p
+            break
+    if not target:
+        return jsonify({"status": "error", "message": f"Proposal {proposal_id} not found"}), 404
+
+    new_threshold = target["proposed_threshold"]
+    config_data = {}
+    if os.path.exists(CONFIG_PATH):
+        try:
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                config_data = json.load(f)
+        except Exception:
+            pass
+    config_data["optimal_threshold"] = new_threshold
+    config_data["last_drift_approval"] = datetime.now(timezone.utc).isoformat()
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(config_data, f, indent=2)
+
+    target["status"] = "approved"
+    target["resolved_at"] = datetime.now(timezone.utc).isoformat()
+    with open(PROPOSALS_LOG_PATH, "w", encoding="utf-8") as f:
+        json.dump(proposals, f, indent=2)
+
+    return jsonify({
+        "status": "approved",
+        "proposal_id": proposal_id,
+        "new_threshold": new_threshold,
+        "proposal": target,
+    }), 200
+
+
+@app.route("/api/policy-proposals/<proposal_id>/reject", methods=["POST"])
+def api_reject_proposal(proposal_id):
+    """Human-in-the-loop: Rejects a proposed policy change, preserving existing threshold."""
+    proposals = load_proposals()
+    target = None
+    for p in proposals:
+        if p.get("proposal_id") == proposal_id:
+            target = p
+            break
+    if not target:
+        return jsonify({"status": "error", "message": f"Proposal {proposal_id} not found"}), 404
+
+    target["status"] = "rejected"
+    target["resolved_at"] = datetime.now(timezone.utc).isoformat()
+    with open(PROPOSALS_LOG_PATH, "w", encoding="utf-8") as f:
+        json.dump(proposals, f, indent=2)
+
+    return jsonify({
+        "status": "rejected",
+        "proposal_id": proposal_id,
+        "current_threshold": get_success_prob_threshold(),
+        "proposal": target,
+    }), 200
+
+
+@app.route("/api/trigger-drift-check", methods=["POST"])
+def api_trigger_drift_check():
+    """Runs drift detection evaluation on demand and returns the resulting proposal."""
+    try:
+        proposal = evaluate_drift()
+        return jsonify({"status": "success", "proposal": proposal}), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 if __name__ == "__main__":

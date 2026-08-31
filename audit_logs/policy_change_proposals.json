@@ -1,0 +1,92 @@
+[
+  {
+    "proposal_id": "prop_drift_20260831_194426",
+    "timestamp": "2026-08-31T19:44:26.115103+00:00",
+    "drift_detected": true,
+    "evaluated_on": "simulated_drift_batch_30d",
+    "dataset_size": 1200,
+    "amount_at_risk": 43947650,
+    "original_performance": {
+      "accuracy": 0.607,
+      "precision": 0.611,
+      "recall": 0.774
+    },
+    "drift_batch_performance": {
+      "accuracy": 0.491,
+      "precision": 0.366,
+      "recall": 0.727
+    },
+    "accuracy_delta_pp": -11.58,
+    "current_threshold": 0.47,
+    "proposed_threshold": 0.83,
+    "net_value_current_threshold": -8050953,
+    "net_value_proposed_threshold": -27933,
+    "estimated_net_value_gain": 8023020,
+    "attempted_at_current": 791,
+    "attempted_at_proposed": 18,
+    "recovery_rate_current": 0.3109,
+    "recovery_rate_proposed": 0.465,
+    "status": "pending_human_approval",
+    "note": "Evaluated on a simulated 30-day-later batch with a deliberately shifted error distribution, not observed production drift."
+  },
+  {
+    "proposal_id": "prop_drift_20260831_194442",
+    "timestamp": "2026-08-31T19:44:42.301228+00:00",
+    "drift_detected": true,
+    "evaluated_on": "simulated_drift_batch_30d",
+    "dataset_size": 1200,
+    "amount_at_risk": 43947650,
+    "original_performance": {
+      "accuracy": 0.607,
+      "precision": 0.611,
+      "recall": 0.774
+    },
+    "drift_batch_performance": {
+      "accuracy": 0.491,
+      "precision": 0.366,
+      "recall": 0.727
+    },
+    "accuracy_delta_pp": -11.58,
+    "current_threshold": 0.47,
+    "proposed_threshold": 0.83,
+    "net_value_current_threshold": -8050953,
+    "net_value_proposed_threshold": -27933,
+    "estimated_net_value_gain": 8023020,
+    "attempted_at_current": 791,
+    "attempted_at_proposed": 18,
+    "recovery_rate_current": 0.3109,
+    "recovery_rate_proposed": 0.465,
+    "status": "pending_human_approval",
+    "note": "Evaluated on a simulated 30-day-later batch with a deliberately shifted error distribution, not observed production drift."
+  },
+  {
+    "proposal_id": "prop_drift_20260831_195614",
+    "timestamp": "2026-08-31T19:56:14.283414+00:00",
+    "drift_detected": true,
+    "evaluated_on": "simulated_drift_batch_30d",
+    "dataset_size": 1200,
+    "amount_at_risk": 43947650,
+    "original_performance": {
+      "accuracy": 0.607,
+      "precision": 0.611,
+      "recall": 0.774
+    },
+    "drift_batch_performance": {
+      "accuracy": 0.491,
+      "precision": 0.366,
+      "recall": 0.727
+    },
+    "accuracy_delta_pp": -11.58,
+    "current_threshold": 0.47,
+    "proposed_threshold": 0.83,
+    "net_value_current_threshold": -8050953,
+    "net_value_proposed_threshold": -27933,
+    "estimated_net_value_gain": 8023020,
+    "attempted_at_current": 791,
+    "attempted_at_proposed": 18,
+    "recovery_rate_current": 0.3109,
+    "recovery_rate_proposed": 0.465,
+    "status": "pending_human_approval",
+    "note": "Evaluated on a simulated 30-day-later batch with a deliberately shifted error distribution, not observed production drift."
+  }
+]

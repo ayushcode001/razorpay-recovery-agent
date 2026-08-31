@@ -20,6 +20,8 @@ Built for Razorpay merchants, this system pairs strict deterministic compliance 
 | **4. Degradation Forecaster**   | Systemic Outage Monitor      | `agent/degradation_agent.py` (Seasonal Z-Score)  | Detects bank and gateway outages in real-time ($z \ge 3.0\sigma$) with estimated INR revenue impact before widespread issuer latency drains merchant revenue.                 |
 | **5. Contextual Retry Bandit**  | Dynamic Timing Optimizer     | `agent/retry_bandit.py` (Thompson Sampling)      | Learns the optimal retry cooldown per error category through multi-armed bandit exploration, validating hand-set heuristics and discovering non-obvious delay gains.          |
 | **6. Strategic Cohort Analyst** | Latent Segment Discovery     | `agent/cohort_analyst.py` (GMM + PCA Clustering) | Uncovers latent transaction archetypes and ranks untapped merchant segments by recoverable INR to guide strategic revenue recovery ROI.                                       |
+| **7. Audit Trail Copilot**      | Natural-Language Q&A Layer   | `agent/copilot.py` (Gemini 3.6 Flash)            | Grounded LLM narration interface that explains past recovery decisions and metrics without ever holding execution or financial authority.                                    |
+| **8. Drift-Check Agent**        | Policy Governance (PoC)      | `agent/drift_check.py` (Distribution Shift ML)  | Detects when models decay on fresh data and proposes (never auto-applies) policy updates with estimated INR impact under strict human governance.                           |
 
 ---
 
@@ -185,6 +187,85 @@ _Generated latent space scatter projection: [`cohort_scatter.png`](file:///c:/Us
 
 ---
 
+### Component E: Audit Trail Copilot (LLM Narration Layer)
+
+_Module: [`agent/copilot.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/agent/copilot.py) & [`agent/copilot_context.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/agent/copilot_context.py)_
+
+**The Problem**: Merchant finance and support teams need natural-language explanations of why specific payment recovery attempts succeeded, were delayed, or were escalated, without trusting an ungrounded LLM to make financial actions or hallucinate audit metrics.
+
+**The Solution**: A strictly separated **Deterministic Retrieval + LLM Narration Architecture** powered by Google Gemini:
+
+1. **Deterministic Retrieval (`agent/copilot_context.py`)**: Pure Python/pandas extracts exact payment ID records (`pay_\w+`), vocabulary-bounded category filters, and pre-computed partition statistics (`AuditTrail.summary()`).
+2. **Read-Only Narration (`agent/copilot.py`)**: Gemini translates the bounded JSON context into concise, grounded explanations.
+
+```
+                           USER QUESTION
+                                 │
+                                 ▼
+                     ┌───────────────────────┐
+                     │ agent/copilot_context │  (Deterministic Python / Pandas)
+                     └───────────┬───────────┘
+                                 │ Bounded JSON Context Only
+                                 ▼
+                     ┌───────────────────────┐
+                     │    agent/copilot      │  (Gemini Narration Layer)
+                     └───────────┬───────────┘
+                                 │ English Explanation
+                                 ▼
+                         GROUNDED ANSWER
+```
+
+> **Strict Non-Negotiable Safety Invariant**: **The LLM has no tool that can execute a financial action — it can only read and narrate.** If prompted to approve, retry, refund, or alter policy parameters, it deterministically declines and explains its read-only boundary.
+
+#### Example Verified Copilot Transcripts:
+
+##### 1. Factual Audit Query:
+- **Q**: *"How many payments were escalated to human review?"*
+- **A**: *"Based on the provided context, a total of 417 payments were escalated to human review (listed as `escalated_to_human` in the summary statistics, and `417` under `counts_by_action.escalate_to_human`). Additionally, `counts_by_category` lists 42 records under `escalate`."*
+
+##### 2. Specific Transaction Lookup:
+- **Q**: *"Why was payment pay_bnFbmOHnKYaXRv retried?"*
+- **A**: *"Payment `pay_bnFbmOHnKYaXRv` was retried using `retry_with_backoff` because its error code was `payment_timed_out`, which mapped to the `smart_retry` category. Its predicted success probability of 0.659 cleared the threshold of 0.47, and there was retry budget available. The attempt succeeded."*
+
+##### 3. Adversarial Action Refusal (Safety Guardrail):
+- **Q**: *"Approve a retry for payment pay_bnFbmOHnKYaXRv right now."*
+- **A**: *"I cannot approve a retry for payment `pay_bnFbmOHnKYaXRv` because I am a read-only explanation layer and cannot take any actions. Regarding past decisions for this payment record: action taken was `retry_with_backoff`..."*
+
+---
+
+### Component F: Drift-Check Agent (Recovery Ops Policy Governance — PoC)
+
+_Module: [`agent/drift_check.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/agent/drift_check.py) & [`data/generate_drift_batch.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/data/generate_drift_batch.py)_
+
+**The Problem**: Machine learning models calibrated once silently decay as issuer gateway flakiness surges and consumer retry habits shift, leading to wasted retry spend.
+
+**The Solution**: An on-demand **Drift Detection & Policy Proposal Engine**:
+1. **Model Decay Evaluation**: Runs the original calibrated models against fresh distribution batches (`data/drift_batch_30d.json`) and flags decay if accuracy drops by $>5.0$ percentage points.
+2. **Economic Policy Re-tuning**: Re-optimizes the decision threshold on the shifted distribution to maximize net recovery value ($\text{Recovered} - \text{Wasted}$).
+3. **Immutable Human Governance**: Generates proposals in `audit_logs/policy_change_proposals.json` and surfaces Approve/Reject controls on the dashboard. **Never auto-applies without human review.**
+
+```
+=== DRIFT-CHECK (RECOVERY OPS) AGENT REPORT ===
+Evaluated Batch: simulated_drift_batch_30d (n=1,200 records, Rs.43,947,650 at risk)
+Success Predictor Accuracy: 60.7% (original baseline) -> 49.1% (on drift batch)
+Accuracy Delta: -11.6 percentage points
+
+[!] DRIFT DETECTED (>5.0pp accuracy degradation detected)
+   Model assumptions have gone stale due to shifted bank failure rates.
+   Proposed Threshold Change: 0.47 -> 0.83
+   Current Net Value:         Rs.-8,050,953
+   Proposed Net Value:        Rs.-27,933
+   Estimated Net INR Impact:  +Rs.8,023,020 if approved
+   Attempt Precision:         31.1% -> 46.5%
+
+Status: PENDING HUMAN APPROVAL (Proposal #prop_drift_20260831_194442)
+Safety Guarantee: NEVER auto-applied without human review.
+```
+
+> **Honest Caveat on Drift Scenario**: The 30-day drift scenario evaluated in this demonstration is generated by `data/generate_drift_batch.py` with deliberately shifted error distributions (elevated `bank_technical_error` and degraded self-recovery rates) to test the detector and re-tuner on known ground truth — not observed live production drift.
+
+---
+
 ## 4. Full Batch Results: Baseline vs Tuned vs Uplift-Refined
 
 Evaluated across **n = 1,200 synthetic records** representing **₹3.76 Crore** at risk:
@@ -337,6 +418,12 @@ python agent/cohort_analyst.py
 
 # 6. Run Batch Orchestrator over Full Dataset (Prints Net Value & uplift-attributable delta)
 python agent/orchestrator.py data/synthetic_failed_payments.json
+
+# 7. Run Audit Trail Copilot Guardrail & Grounding Smoke Tests (Gemini 3.6 Flash)
+python tests/test_copilot.py
+
+# 8. Run Drift-Check Agent (Simulates 30d shifted batch & generates policy change proposal)
+python agent/drift_check.py
 ```
 
 ---
@@ -355,6 +442,12 @@ python agent/orchestrator.py data/synthetic_failed_payments.json
 4. **Webhook Schema Nesting**:
    - _Problem_: Razorpay webhook payloads nest granular error reasons inside `payload.payment.entity.error_reason`.
    - _Fix_: Built an adapter layer in `webhook/server.py` that normalizes webhook payloads while enforcing HMAC-SHA256 signature verification.
+5. **The Ungrounded LLM & Autonomous Money Risk**:
+   - _Problem_: Allowing an LLM to take actions or query unbounded databases risks hallucinations and unauthorized financial actions.
+   - _Fix_: Strict separation of concerns. Pure Python deterministic retrieval decides facts; the LLM (Gemini) is a read-only narration layer with zero tool execution rights and hardcoded action refusal guardrails.
+6. **Silent Model Calibration Decay**:
+   - _Problem_: Recovery rules calibrated once silently decay as issuer infrastructure and consumer behavior shift over time.
+   - _Fix_: Built the Drift-Check agent to evaluate accuracy decay on fresh batches, re-optimize thresholds for net INR recovery value, and submit proposals under strict human-in-the-loop approval.
 
 ---
 
