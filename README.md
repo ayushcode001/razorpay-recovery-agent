@@ -4,7 +4,7 @@
 
 > **An autonomous, explainable AI revenue recovery agent that detects failed Razorpay payments, isolates causal intervention uplift from organic self-recovery, optimizes retry cooldowns via reinforcement learning, monitors systemic outages in real-time, and executes bounded recovery workflows with a full audit trail.**
 
-Built for Razorpay merchants, this system pairs strict deterministic compliance gates with **4 specialized machine learning models** to maximize net recovered revenue while eliminating wasted retry spend, spamming, and customer friction.
+Built for Razorpay merchants, this system pairs strict deterministic compliance gates with **6 specialized AI/ML models** and **2 governance/narration layers (8 cohesive components)** to maximize net recovered revenue while eliminating wasted retry spend, spamming, and customer friction.
 
 **Repository**: [https://github.com/ayushcode001/razorpay-recovery-agent](https://github.com/ayushcode001/razorpay-recovery-agent)
 
@@ -32,28 +32,63 @@ A standard pitfall in AI payment hackathons is **"Fake ML"** — training an NLP
 ### Clear Separation of Concerns:
 
 ```
-                      PAYMENT FAILURE EVENT
-                               │
-               ┌───────────────┴───────────────┐
-               ▼                               ▼
-     DETERMINISTIC DOMAIN              LEARNED ML MODELS
-       (Known Knowns)                  (Unknown Signals)
-   • Allowed actions per error      • P(Success | Context)
-   • Hard compliance/risk stops     • Causal Uplift (P1 - P0)
-   • Max retry limits & cooldowns   • Dynamic Timing (Bandit)
-   • Zero hallucination guarantee   • Outage Anomaly Z-Score
+                                        PAYMENT FAILURE EVENT
+                                                  │
+                 ┌────────────────────────────────┴────────────────────────────────┐
+                 ▼                                                                 ▼
+       DETERMINISTIC DOMAIN                                                LEARNED ML & AI MODELS
+         (Known Knowns)                                                       (Unknown Signals)
+     • Allowed actions per error                                          • P(Success | Context) [Gradient Boosting]
+     • Hard compliance/risk stops                                         • Causal Uplift (P1 - P0) [T-Learner]
+     • Max retry limits & cooldowns                                       • Dynamic Delay Optimization [Thompson Bandit]
+     • Zero hallucination guarantee                                       • Real-time Outage Detection [Seasonal Z-Score]
+                                                                          • Latent Cohort Discovery [GMM + PCA]
+                                                                          • Grounded Decision Narration [Gemini Copilot]
+                                                                          • Policy Drift Governance [Shift Detector]
 ```
 
-1. **Deterministic Taxonomy**: Domain policy decides what actions are legally and operationally _permissible_.
-2. **Success Predictor**: Learns whether an allowed intervention will _actually succeed_ given transaction context.
-3. **Causal Uplift Gate**: Verifies whether our intervention adds _causal lift_ or whether the customer would self-recover without us.
-4. **Data-Driven Policy Engine**: Combines taxonomy rules + tuned success threshold (0.47) + uplift gate ($\ge 0.05$) into a bounded, explainable decision.
+### The 8-Component Operational Workflow:
+
+1. **Deterministic Taxonomy (`agent/taxonomy.py`)**: Domain policy decides what actions are legally and operationally _permissible_ (hard compliance stops).
+2. **Success Predictor (`agent/success_predictor.py`)**: Learns whether an allowed intervention will _actually succeed_ given transaction context ($P \ge 0.47$).
+3. **Causal Uplift Gate (`agent/uplift_model.py`)**: Isolates genuine intervention lift from organic self-recovery ($\mu_1 - \mu_0 \ge 0.05$) to prevent spamming users who self-resolve.
+4. **Data-Driven Policy Engine (`agent/policy_engine.py`)**: Combines taxonomy gates + tuned threshold ($0.47$) + uplift gate ($\ge 0.05$) into a bounded, explainable decision.
+5. **Degradation Forecaster (`agent/degradation_agent.py`)**: Real-time time-series anomaly monitor tracking $z \ge 3.0\sigma$ issuer spikes to prevent burning retries during macro outages.
+6. **Contextual Retry Bandit (`agent/retry_bandit.py`)**: Thompson Sampling multi-armed bandit dynamically converging to the optimal delay per category.
+7. **Strategic Cohort Analyst (`agent/cohort_analyst.py`)**: Unsupervised GMM + PCA clustering discovering latent merchant segments and ranking untapped recoverable INR.
+8. **Audit Trail Copilot (`agent/copilot.py`)**: Grounded Gemini narration layer providing read-only explanations with strict refusal of financial/action requests.
+9. **Drift-Check Governance (`agent/drift_check.py`)**: On-demand distribution shift monitor that evaluates model decay and submits threshold proposals for human review.
 
 ---
 
-## 3. Deep Dive: The 4 Advanced ML Components & Insights
+## 3. Deep Dive: The 7 Advanced ML & AI Components
 
-### Component A: Causal Uplift Modeling (T-Learner Causal ML)
+### Component A: Success Predictor (Gradient Boosting Classifier)
+
+_Module: [`agent/success_predictor.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/agent/success_predictor.py)_
+
+**The Problem**: Not all failures in a retryable taxonomy category are equally viable. Retrying a ₹150,000 corporate transaction at 3 AM after 3 prior failed attempts is statistically doomed and burns retry spend.
+
+**The Solution**: A calibrated **Gradient Boosting Classifier (HistGradientBoostingClassifier)** that estimates $P(\text{recovery succeeds} \mid \text{transaction context})$:
+- **Feature Pipeline**: Numerical features (`amount`, `retry_count`, `hour_of_day`) + one-hot categorical features (`method`, `bank`, `card_type`, `error_source`, `error_step`, `error_code`, `category`).
+- **Optimal Decision Threshold ($0.47$)**: Calibrated via grid search in [`agent/threshold_tuner.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/agent/threshold_tuner.py) to maximize net INR recovery value ($\text{Recovered} - \text{Wasted}$).
+
+#### Held-Out Test Evaluation (n=300 transactions, 54.67% base success rate):
+
+- **Overall Accuracy**: **60.67%**
+- **Success Class (`1`)**: **Precision: 61.0%**, **Recall: 77.4%**, **F1: 0.68** (127 True Positives / 37 False Negatives)
+- **Failure Class (`0`)**: **Precision: 59.8%**, **Recall: 40.4%**, **F1: 0.48** (55 True Negatives / 81 False Positives)
+- **Confusion Matrix**:
+  ```text
+  [[ 55 (TN),  81 (FP) ]
+   [ 37 (FN), 127 (TP) ]]
+  ```
+
+> **Honest ML Metric Disclosure**: In payment recovery, human intent and bank gateway availability contain natural stochastic variance. Reporting an honest, un-inflated **~61% precision and 77% recall on success** reflects real-world engineering fidelity. The model avoids cherry-picked 99% accuracy traps while providing meaningful ranking signals for policy optimization.
+
+---
+
+### Component B: Causal Uplift Modeling (T-Learner Causal ML)
 
 _Module: [`agent/uplift_model.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/agent/uplift_model.py)_
 
@@ -90,7 +125,7 @@ _Module: [`agent/uplift_model.py`](file:///c:/Users/Acer/Desktop/razorpay-recove
 
 ---
 
-### Component B: Time-Series Outage Forecasting & Degradation Monitoring
+### Component C: Time-Series Outage Forecasting & Degradation Monitoring
 
 _Module: [`agent/degradation_agent.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/agent/degradation_agent.py)_
 
@@ -130,7 +165,7 @@ _Surfaced dynamically on the live dashboard (`/`) and API (`/api/degradation-ale
 
 ---
 
-### Component C: Contextual Bandit for Dynamic Retry Timing
+### Component D: Contextual Bandit for Dynamic Retry Timing
 
 _Module: [`agent/retry_bandit.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/agent/retry_bandit.py)_
 
@@ -161,7 +196,7 @@ _Generated convergence comparison plot: [`bandit_convergence.png`](file:///c:/Us
 
 ---
 
-### Component D: Strategic Cohort Analyst (Unsupervised Clustering)
+### Component E: Strategic Cohort Analyst (Unsupervised Clustering)
 
 _Module: [`agent/cohort_analyst.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/agent/cohort_analyst.py)_
 
@@ -187,7 +222,7 @@ _Generated latent space scatter projection: [`cohort_scatter.png`](file:///c:/Us
 
 ---
 
-### Component E: Audit Trail Copilot (LLM Narration Layer)
+### Component F: Audit Trail Copilot (LLM Narration Layer)
 
 _Module: [`agent/copilot.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/agent/copilot.py) & [`agent/copilot_context.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/agent/copilot_context.py)_
 
@@ -233,7 +268,7 @@ _Module: [`agent/copilot.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-ag
 
 ---
 
-### Component F: Drift-Check Agent (Recovery Ops Policy Governance — PoC)
+### Component G: Drift-Check Agent (Recovery Ops Policy Governance — PoC)
 
 _Module: [`agent/drift_check.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/agent/drift_check.py) & [`data/generate_drift_batch.py`](file:///c:/Users/Acer/Desktop/razorpay-recovery-agent/data/generate_drift_batch.py)_
 
@@ -268,9 +303,11 @@ Safety Guarantee: NEVER auto-applied without human review.
 
 > **2. Known Limitation & Architectural Synergy with Degradation Agent**:
 > - **Current PoC Limitation**: The current re-tuner applies a single global threshold correction ($0.47 \rightarrow 0.83$) across all categories and banks uniformly. This is a blunt instrument: unaffected categories (`card_expired`, `incorrect_cvv`) are held to an unnecessarily strict standard, potentially suppressing valid recovery attempts.
-> - **Production Architecture (Degradation-Scoped Gating)**: The production design pairs the Drift-Check Agent with the **Degradation Forecaster (Component B)**. Instead of a global bar hike, the Degradation Agent's granular channel telemetry ($z \ge 3.0\sigma$) isolates the specific failing issuer/method (e.g. HDFC Card or ICICI UPI) to selectively elevate thresholds or pause retries *only on the affected pipe*, leaving healthy, high-uplift categories operating at full throttle.
+> - **Production Architecture (Degradation-Scoped Gating)**: The production design pairs the Drift-Check Agent with the **Degradation Forecaster (Component C)**. Instead of a global bar hike, the Degradation Agent's granular channel telemetry ($z \ge 3.0\sigma$) isolates the specific failing issuer/method (e.g. HDFC Card or ICICI UPI) to selectively elevate thresholds or pause retries *only on the affected pipe*, leaving healthy, high-uplift categories operating at full throttle.
 
-> **3. Honest Caveat on Drift Scenario**: The 30-day drift scenario evaluated in this demonstration is generated by `data/generate_drift_batch.py` with deliberately shifted error distributions (elevated `bank_technical_error` and degraded self-recovery rates) to test the detector and re-tuner on known ground truth — not observed live production drift.
+> **3. Near-Chance Accuracy & Retraining Stopgap**: On the drift batch, the success predictor accuracy drops to **49.1%** — effectively at chance level (~50%), indicating that the model has essentially lost predictive signal on the shifted distribution. Raising the threshold to $0.83$ is a defensive containment measure (becoming strictly conservative when the model cannot be trusted); however, the correct long-term operational response to near-chance performance degradation is **retraining the model pipeline on fresh data**, not merely moving the decision boundary on an already-blind model.
+
+> **4. Honest Caveat on Drift Scenario**: The 30-day drift scenario evaluated in this demonstration is generated by `data/generate_drift_batch.py` with deliberately shifted error distributions (elevated `bank_technical_error` and degraded self-recovery rates) to test the detector and re-tuner on known ground truth — not observed live production drift.
 
 ---
 
