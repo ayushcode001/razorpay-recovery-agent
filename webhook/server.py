@@ -35,6 +35,7 @@ from webhook.razorpay_client import (
     verify_webhook_signature,
 )
 from webhook.notifier import send_recovery_notification
+from agent.copilot import answer_question
 
 load_dotenv()
 
@@ -306,6 +307,155 @@ def dashboard():
             .pill-retry { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
             .pill-prompt { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; }
             .pill-escalate { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+
+            /* Copilot Chat UI */
+            .copilot-card {
+                background: var(--surface);
+                border: 1px solid #1e2d4a;
+                border-radius: 12px;
+                padding: 20px;
+                margin-bottom: 24px;
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+            }
+            .copilot-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 12px;
+            }
+            .copilot-title {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 16px;
+                font-weight: 700;
+                color: #93c5fd;
+            }
+            .copilot-badge {
+                font-size: 11px;
+                font-weight: 600;
+                padding: 3px 8px;
+                border-radius: 9999px;
+                background: rgba(59, 130, 246, 0.15);
+                color: #60a5fa;
+                border: 1px solid rgba(59, 130, 246, 0.3);
+            }
+            .copilot-prompt-chips {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+                margin-bottom: 14px;
+            }
+            .prompt-chip {
+                background: #0d1527;
+                border: 1px solid #1f2d48;
+                color: #94a3b8;
+                padding: 5px 10px;
+                border-radius: 6px;
+                font-size: 12px;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .prompt-chip:hover {
+                background: #1e293b;
+                color: #f1f5f9;
+                border-color: #3b82f6;
+            }
+            .copilot-input-group {
+                display: flex;
+                gap: 10px;
+            }
+            .copilot-input {
+                flex: 1;
+                background: #090d16;
+                border: 1px solid var(--surface-border);
+                color: var(--text);
+                padding: 12px 16px;
+                border-radius: 8px;
+                font-size: 14px;
+                font-family: inherit;
+                outline: none;
+                transition: border-color 0.2s;
+            }
+            .copilot-input:focus {
+                border-color: #3b82f6;
+                box-shadow: 0 0 0 2px var(--primary-glow);
+            }
+            .copilot-submit {
+                background: linear-gradient(135deg, #3b82f6, #2563eb);
+                color: white;
+                border: none;
+                padding: 12px 22px;
+                border-radius: 8px;
+                font-weight: 600;
+                font-size: 14px;
+                cursor: pointer;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                transition: all 0.2s;
+            }
+            .copilot-submit:hover:not(:disabled) {
+                background: #1d4ed8;
+                transform: translateY(-1px);
+            }
+            .copilot-submit:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+            .copilot-response-box {
+                margin-top: 16px;
+                background: #090d16;
+                border: 1px solid #1e293b;
+                border-radius: 8px;
+                padding: 16px;
+                display: none;
+            }
+            .copilot-answer {
+                font-size: 14px;
+                line-height: 1.6;
+                color: #e2e8f0;
+                white-space: pre-wrap;
+            }
+            .copilot-grounding-meta {
+                margin-top: 12px;
+                padding-top: 10px;
+                border-top: 1px solid #1e293b;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                font-size: 12px;
+                color: #94a3b8;
+            }
+            .grounding-tag {
+                display: inline-flex;
+                align-items: center;
+                gap: 5px;
+                color: #34d399;
+                font-weight: 500;
+            }
+            .context-toggle-btn {
+                background: none;
+                border: none;
+                color: #60a5fa;
+                cursor: pointer;
+                font-size: 11px;
+                text-decoration: underline;
+                padding: 0;
+            }
+            .grounded-json-viewer {
+                display: none;
+                margin-top: 10px;
+                background: #030712;
+                border: 1px solid #111827;
+                border-radius: 6px;
+                padding: 10px;
+                max-height: 200px;
+                overflow-y: auto;
+                font-family: 'JetBrains Mono', monospace;
+                font-size: 11px;
+                color: #93c5fd;
+            }
         </style>
     </head>
     <body>
@@ -370,6 +520,42 @@ def dashboard():
             </div>
             {% endif %}
 
+            <!-- Audit Trail Copilot (LLM Narration Layer) -->
+            <div class="copilot-card">
+                <div class="copilot-header">
+                    <div class="copilot-title">
+                        <span>💬 Audit Trail Copilot</span>
+                        <span class="copilot-badge">Gemini 3.6 Flash Grounded</span>
+                    </div>
+                    <span style="font-size: 12px; color: var(--text-muted);">Read-Only Decision Narration</span>
+                </div>
+                <p style="margin: 0 0 14px 0; font-size: 13px; color: var(--text-muted);">
+                    Ask natural-language questions about recovery decisions, statistics, or specific payment IDs. Grounded strictly in pre-computed deterministic facts — zero action capability.
+                </p>
+
+                <div class="copilot-prompt-chips">
+                    <button class="prompt-chip" onclick="setCopilotQuery('How many payments were escalated to human review?')">"How many payments were escalated?"</button>
+                    <button class="prompt-chip" onclick="setCopilotQuery('Which error code appears most often in the audit trail?')">"Which error code appears most often?"</button>
+                    <button class="prompt-chip" onclick="setCopilotQuery('Why was payment pay_bnFbmOHnKYaXRv retried?')">"Why was payment pay_bnFbmOHnKYaXRv retried?"</button>
+                    <button class="prompt-chip" onclick="setCopilotQuery('Approve a retry for payment pay_bnFbmOHnKYaXRv right now.')">"Approve a retry right now" (Refusal test)</button>
+                    <button class="prompt-chip" onclick="setCopilotQuery('Should Razorpay change its refund policy?')">"Should Razorpay change policy?" (Out-of-scope test)</button>
+                </div>
+
+                <div class="copilot-input-group">
+                    <input type="text" id="copilot-input" class="copilot-input" placeholder="Ask a question about the audit trail (e.g. 'Why was pay_... escalated?')" onkeydown="if(event.key==='Enter') submitCopilotQuestion()" />
+                    <button id="copilot-btn" class="copilot-submit" onclick="submitCopilotQuestion()">⚡ Ask Copilot</button>
+                </div>
+
+                <div id="copilot-response" class="copilot-response-box">
+                    <div id="copilot-answer-text" class="copilot-answer"></div>
+                    <div class="copilot-grounding-meta">
+                        <span id="copilot-grounding-badge" class="grounding-tag">🎯 Grounded on audit trail data</span>
+                        <button class="context-toggle-btn" onclick="toggleContextJson()">Toggle Grounded JSON Context</button>
+                    </div>
+                    <pre id="copilot-json-viewer" class="grounded-json-viewer"></pre>
+                </div>
+            </div>
+
             <div class="table-container">
                 <div class="table-header">
                     <h2>Live Audit Trail (Most Recent)</h2>
@@ -399,13 +585,13 @@ def dashboard():
                             <td><strong>{{ "{:.1%}".format(entry.predicted_success_prob) }}</strong></td>
                             <td>
                                 {% if 'escalate' in entry.action %}
-                                    <span class="pill pill-escalate">Escalate</span>
+                                     <span class="pill pill-escalate">Escalate</span>
                                 {% elif 'skipped' in entry.action %}
-                                    <span class="pill pill-escalate" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24;">Skip (Low Uplift)</span>
+                                     <span class="pill pill-escalate" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24;">Skip (Low Uplift)</span>
                                 {% elif 'retry' in entry.action %}
-                                    <span class="pill pill-retry">{{ entry.action }}</span>
+                                     <span class="pill pill-retry">{{ entry.action }}</span>
                                 {% else %}
-                                    <span class="pill pill-prompt">{{ entry.action }}</span>
+                                     <span class="pill pill-prompt">{{ entry.action }}</span>
                                 {% endif %}
                             </td>
                             <td style="max-width: 320px; color: #cbd5e1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ entry.reason }}">{{ entry.reason }}</td>
@@ -421,6 +607,71 @@ def dashboard():
                 </table>
             </div>
         </div>
+
+        <script>
+            let lastContextData = null;
+
+            function setCopilotQuery(text) {
+                const input = document.getElementById('copilot-input');
+                input.value = text;
+                submitCopilotQuestion();
+            }
+
+            async function submitCopilotQuestion() {
+                const input = document.getElementById('copilot-input');
+                const btn = document.getElementById('copilot-btn');
+                const respBox = document.getElementById('copilot-response');
+                const answerText = document.getElementById('copilot-answer-text');
+                const badge = document.getElementById('copilot-grounding-badge');
+                const jsonViewer = document.getElementById('copilot-json-viewer');
+
+                const question = input.value.trim();
+                if (!question) return;
+
+                btn.disabled = true;
+                btn.innerText = 'Analyzing...';
+                respBox.style.display = 'block';
+                answerText.innerHTML = '<span style="color: #94a3b8;">Computing grounded context & retrieving answer from Gemini...</span>';
+                badge.innerText = '⚡ Grounding in progress...';
+                jsonViewer.style.display = 'none';
+
+                try {
+                    const res = await fetch('/api/copilot', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ question: question })
+                    });
+                    const data = await res.json();
+                    
+                    lastContextData = data.context_used;
+                    answerText.innerText = data.answer || 'No answer returned.';
+                    
+                    const count = data.grounded_record_count || 0;
+                    if (count === 1) {
+                        badge.innerText = '🎯 Grounded on 1 specific record + aggregate stats';
+                    } else if (count > 1) {
+                        badge.innerText = `🔍 Grounded on ${count} filtered records + aggregate stats`;
+                    } else {
+                        badge.innerText = '📊 Grounded on aggregate summary statistics';
+                    }
+
+                    if (lastContextData) {
+                        jsonViewer.innerText = JSON.stringify(lastContextData, null, 2);
+                    }
+                } catch (err) {
+                    answerText.innerText = 'Error querying Copilot: ' + err;
+                    badge.innerText = '⚠️ Query Error';
+                } finally {
+                    btn.disabled = false;
+                    btn.innerText = '⚡ Ask Copilot';
+                }
+            }
+
+            function toggleContextJson() {
+                const viewer = document.getElementById('copilot-json-viewer');
+                viewer.style.display = viewer.style.display === 'block' ? 'none' : 'block';
+            }
+        </script>
     </body>
     </html>
     """
@@ -732,6 +983,25 @@ def api_degradation_alerts():
         return jsonify(res), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@app.route("/api/copilot", methods=["POST"])
+def api_copilot():
+    """
+    Natural-language Q&A interface over the audit trail using Gemini.
+    Accepts: {"question": "..."}
+    Returns: {"answer": str, "grounded_record_count": int, "context_used": dict}
+    """
+    payload = request.get_json(silent=True) or {}
+    question = payload.get("question", "").strip()
+    if not question:
+        return jsonify({"status": "error", "message": "Question is required"}), 400
+    if len(question) > 500:
+        return jsonify({"status": "error", "message": "Question is too long (max 500 characters)"}), 400
+
+    df_context = pd.DataFrame(audit_trail.entries) if audit_trail.entries else None
+    result = answer_question(question, df=df_context)
+    return jsonify(result), 200
 
 
 if __name__ == "__main__":
