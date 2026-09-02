@@ -5,3 +5,16 @@ __pycache__/
 *.pyo
 .pytest_cache/
 .DS_Store
+
+# Build artifacts and serialized models
+models/
+agent/uplift_model_state.pkl
+
+# Live runtime audit logs (keep sample_audit_trail.json tracked for reviewers)
+audit_logs/audit_trail.json
+audit_logs/policy_change_proposals.json
+
+# Frontend build artifacts and dependencies
+frontend/node_modules/
+frontend/dist/
+frontend/.env

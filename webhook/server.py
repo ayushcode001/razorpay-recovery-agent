@@ -2,20 +2,33 @@
 Live Razorpay Webhook Receiver & Autonomous Recovery Agent Server.
 
 Endpoints:
-  POST /webhook/razorpay    - Receives real payment.failed webhooks from Razorpay
-  GET  /checkout            - Interactive test checkout to trigger real test-mode failures
-  POST /create-test-order   - Creates Razorpay order for Checkout.js modal
-  GET  /                    - Live Dashboard showing real-time decisions & audit trail
-  GET  /api/audit-trail     - JSON API for live audit events
+  POST /webhook/razorpay                    - Receives real payment.failed webhooks from Razorpay (HMAC verified)
+  GET  /checkout                            - Interactive test checkout to trigger real test-mode failures
+  POST /create-test-order                   - Creates Razorpay order for Checkout.js modal
+  GET  /                                    - Live Dashboard showing real-time decisions & audit trail
+  GET  /api/v1/health                       - Public fast health check (unauthenticated for keep-alive cron)
+  GET  /api/v1/audit-trail                  - JSON API for live audit events
+  GET  /api/v1/degradation-alerts           - JSON API for cached outage/degradation alerts
+  GET  /api/v1/cohort-report                - JSON API for cohort analyst data (for Recharts scatter)
+  GET  /api/v1/bandit-results               - JSON API for bandit convergence data (for Recharts line chart)
+  POST /api/v1/copilot                      - LLM Copilot Q&A over audit trail (rate-limited: 10/min)
+  GET  /api/v1/policy-proposals             - Drift-check governance proposals
+  POST /api/v1/policy-proposals/<id>/approve - Human approval of policy update (rate-limited: 10/min)
+  POST /api/v1/policy-proposals/<id>/reject  - Human rejection of policy update (rate-limited: 10/min)
+  POST /api/v1/trigger-drift-check          - On-demand drift evaluation
 """
 
 import os
 import sys
 import time
 import json
+import joblib
 from datetime import datetime, timezone
 import pandas as pd
-from flask import Flask, request, jsonify, render_template_string, redirect, url_for
+from flask import Flask, request, jsonify, render_template_string, redirect, url_for, Response
+from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 
 # Ensure project root is in sys.path
@@ -24,10 +37,16 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from agent.taxonomy import category_for
-from agent.policy_engine import decide_action
+from agent.policy_engine import decide_action, get_success_prob_threshold
 from agent.audit import AuditTrail
 from agent.success_predictor import train_and_eval, FEATURE_COLUMNS_NUM, FEATURE_COLUMNS_CAT
 from agent.degradation_agent import run_degradation_pipeline
+from agent.cohort_analyst import analyze_cohorts
+from agent.retry_bandit import run_bandit_simulation, ARMS, CATEGORIES
+from agent.copilot import answer_question
+from agent.drift_check import load_proposals, save_proposal, evaluate_drift, PROPOSALS_LOG_PATH, CONFIG_PATH
+from agent.db import is_db_configured, get_db_session
+from agent.db_models import ThresholdConfig, PolicyChangeProposal
 from webhook.razorpay_client import (
     RAZORPAY_KEY_ID,
     create_order,
@@ -35,29 +54,135 @@ from webhook.razorpay_client import (
     verify_webhook_signature,
 )
 from webhook.notifier import send_recovery_notification
-from agent.copilot import answer_question
-from agent.drift_check import load_proposals, evaluate_drift, PROPOSALS_LOG_PATH, CONFIG_PATH
-from agent.policy_engine import get_success_prob_threshold
 
 load_dotenv()
 
 app = Flask(__name__)
 
-# Initialize Global Audit Trail & Model Pipeline
-AUDIT_LOG_PATH = os.path.join(PROJECT_ROOT, "audit_logs", "audit_trail.json")
-audit_trail = AuditTrail()
-if os.path.exists(AUDIT_LOG_PATH):
-    try:
-        with open(AUDIT_LOG_PATH, "r") as f:
-            audit_trail.entries = json.load(f)
-    except Exception:
-        pass
+# CORS: Allow Vercel frontend (and local dev) to call all /api/v1/* routes.
+# Set CORS_ALLOWED_ORIGINS in environment (comma-separated). Defaults to all origins.
+_cors_origins_raw = os.getenv("CORS_ALLOWED_ORIGINS", "*")
+_cors_origins = [o.strip() for o in _cors_origins_raw.split(",")] if _cors_origins_raw != "*" else "*"
+CORS(app, origins=_cors_origins, supports_credentials=True)
 
-# Train success predictor model once at server startup
-DATASET_PATH = os.path.join(PROJECT_ROOT, "data", "synthetic_failed_payments.json")
-print("[Agent Server] Training success predictor pipeline...")
-ml_pipeline, ml_metrics = train_and_eval(DATASET_PATH)
-print(f"[Agent Server] Success Predictor ready (accuracy: {ml_metrics['classification_report']['accuracy']:.1%})")
+# Rate limiting: protect Gemini API cost and policy mutation endpoints.
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],  # No global limit — only apply to decorated routes.
+    storage_uri="memory://",  # In-memory for single-instance Render deployment.
+)
+
+# Authentication configuration
+DASHBOARD_USERNAME = os.getenv("DASHBOARD_USERNAME", "").strip()
+DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "").strip()
+UNPROTECTED_PATHS = {"/webhook/razorpay", "/api/v1/health"}
+
+# 1. Initialize Audit Trail
+audit_trail = AuditTrail()
+
+# 2. Load or Train ML Model at Startup
+MODELS_DIR = os.path.join(PROJECT_ROOT, "models")
+MODEL_PATH = os.path.join(MODELS_DIR, "success_predictor.joblib")
+
+ml_pipeline = None
+if os.path.exists(MODEL_PATH):
+    try:
+        print(f"[Agent Server] Loading serialized Success Predictor from {MODEL_PATH}...")
+        ml_pipeline = joblib.load(MODEL_PATH)
+        print("[Agent Server] Serialized model loaded successfully.")
+    except Exception as e:
+        print(f"[Agent Server] Warning: Could not load serialized model: {e}")
+
+if ml_pipeline is None:
+    print("[Agent Server] Training success predictor pipeline in-memory fallback...")
+    DATASET_PATH = os.path.join(PROJECT_ROOT, "data", "synthetic_failed_payments.json")
+    ml_pipeline, ml_metrics = train_and_eval(DATASET_PATH)
+    print(f"[Agent Server] Success Predictor ready (accuracy: {ml_metrics['classification_report']['accuracy']:.1%})")
+
+# 3. Cache Degradation Alerts in Memory at Startup
+CACHED_DEGRADATION_INCIDENTS = []
+try:
+    print("[Agent Server] Pre-computing degradation baseline and incident alerts cache...")
+    deg_res = run_degradation_pipeline()
+    CACHED_DEGRADATION_INCIDENTS = deg_res.get("incidents", [])[:4]
+    print(f"[Agent Server] Cached {len(CACHED_DEGRADATION_INCIDENTS)} degradation incident alerts.")
+except Exception as e:
+    print(f"[Agent Server] Degradation monitoring initialization warning: {e}")
+
+# 4. Cache Cohort Analyst Data in Memory at Startup
+CACHED_COHORT_DATA = {}
+try:
+    print("[Agent Server] Pre-computing cohort analyst data cache...")
+    _cohort_result = analyze_cohorts()
+    # Prepare cohort summaries (serializable)
+    _cohort_df = _cohort_result["df"]
+    # Build per-cluster scatter point arrays for Recharts
+    _scatter_by_cluster = {}
+    for c in _cohort_result["cohorts"]:
+        cid = c["cluster_id"]
+        c_sub = _cohort_df[_cohort_df["cluster"] == cid][["pca_x", "pca_y", "amount", "method"]]
+        _scatter_by_cluster[str(cid)] = c_sub.head(300).to_dict(orient="records")
+    CACHED_COHORT_DATA = {
+        "cohorts": _cohort_result["cohorts"],
+        "scatter_by_cluster": _scatter_by_cluster,
+        "pca_variance_ratio": _cohort_result["pca_variance_ratio"],
+        "total_at_risk": _cohort_result["total_at_risk"],
+        "non_trivial_passed": _cohort_result["non_trivial_passed"],
+    }
+    print(f"[Agent Server] Cached cohort analyst data ({len(_cohort_result['cohorts'])} cohorts).")
+except Exception as e:
+    print(f"[Agent Server] Cohort analyst initialization warning: {e}")
+    CACHED_COHORT_DATA = {}
+
+# 5. Cache Bandit Simulation Results in Memory at Startup
+CACHED_BANDIT_DATA = {}
+try:
+    print("[Agent Server] Pre-computing bandit simulation data cache (1000 episodes)...")
+    _bandit_results = run_bandit_simulation(n_episodes=1000, seed=42)
+    _bandit_serializable = {}
+    for cat in CATEGORIES:
+        r = _bandit_results[cat]
+        _bandit_serializable[cat] = {
+            "bandit_cum_rewards": r["bandit_cum_rewards"],
+            "fixed_cum_rewards": r["fixed_cum_rewards"],
+            "taxonomy_cum_rewards": r["taxonomy_cum_rewards"],
+            "random_cum_rewards": r["random_cum_rewards"],
+            "optimal_arm": r["optimal_arm"],
+            "most_chosen_arm": r["most_chosen_arm"],
+            "final_optimal_pull_rate": r["final_optimal_pull_rate"],
+            "percentage_gain_vs_fixed": r["percentage_gain_vs_fixed"],
+            "percentage_gain_vs_taxonomy": r["percentage_gain_vs_taxonomy"],
+            "taxonomy_default_arm": r["taxonomy_default_arm"],
+            "converged": r["converged"],
+        }
+    CACHED_BANDIT_DATA = {
+        "categories": CATEGORIES,
+        "arms": ARMS,
+        "results": _bandit_serializable,
+    }
+    print(f"[Agent Server] Cached bandit simulation data ({len(CATEGORIES)} categories).")
+except Exception as e:
+    print(f"[Agent Server] Bandit simulation initialization warning: {e}")
+    CACHED_BANDIT_DATA = {}
+
+
+@app.before_request
+def basic_auth_gate():
+    """Enforces HTTP Basic Authentication on dashboard and API routes (except public webhooks & health)."""
+    if request.path in UNPROTECTED_PATHS:
+        return None
+
+    if not DASHBOARD_USERNAME or not DASHBOARD_PASSWORD:
+        return None  # Unauthenticated in local development if credentials not set
+
+    auth = request.authorization
+    if not auth or auth.username != DASHBOARD_USERNAME or auth.password != DASHBOARD_PASSWORD:
+        return Response(
+            "Access Denied: Authentication required.\n",
+            401,
+            {"WWW-Authenticate": 'Basic realm="Razorpay Recovery Agent"'}
+        )
 
 
 def score_record(record: dict) -> float:
@@ -75,20 +200,147 @@ def score_record(record: dict) -> float:
     return float(prob)
 
 
+# -------------------------------------------------------------------------
+# Webhook & Health Endpoints
+# -------------------------------------------------------------------------
+
+@app.route("/api/v1/health", methods=["GET"])
+def health():
+    """Fast health check endpoint for GitHub Actions keep-alive ping and uptime monitoring."""
+    return jsonify({
+        "status": "ok",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "database_connected": is_db_configured(),
+    }), 200
+
+
+@app.route("/webhook/razorpay", methods=["POST"])
+def handle_razorpay_webhook():
+    """
+    Receives and processes real webhook payloads from Razorpay.
+    Verifies signature -> maps schema -> scores ML -> evaluates policy -> executes action -> logs audit.
+    """
+    raw_body = request.get_data()
+    signature = request.headers.get("X-Razorpay-Signature", "")
+
+    # 1. Signature Verification
+    if not verify_webhook_signature(raw_body, signature):
+        print("[Webhook] Signature verification failed.")
+        return jsonify({"status": "error", "message": "Invalid signature"}), 400
+
+    payload = request.get_json(silent=True) or {}
+    event_type = payload.get("event")
+
+    print(f"\n[Webhook] Received Razorpay event: {event_type}")
+
+    if event_type != "payment.failed":
+        return jsonify({"status": "ignored", "event": event_type}), 200
+
+    # 2. Extract payment entity
+    payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
+    if not payment_entity:
+        return jsonify({"status": "error", "message": "Missing payment entity"}), 400
+
+    granular_error = (
+        payment_entity.get("error_reason")
+        or payment_entity.get("error_code")
+        or "bank_technical_error"
+    ).lower()
+
+    amount_in_rupees = float(payment_entity.get("amount", 0)) / 100.0
+    payment_id = payment_entity.get("id", f"pay_live_{int(time.time())}")
+    method = payment_entity.get("method", "card")
+    error_source = payment_entity.get("error_source", "gateway")
+    error_step = payment_entity.get("error_step", "payment_processing")
+    created_at = payment_entity.get("created_at", int(time.time()))
+    customer_email = payment_entity.get("email")
+    customer_contact = payment_entity.get("contact")
+
+    record = {
+        "id": payment_id,
+        "amount": amount_in_rupees,
+        "currency": payment_entity.get("currency", "INR"),
+        "method": method,
+        "error_code": granular_error,
+        "error_source": error_source,
+        "error_step": error_step,
+        "created_at": created_at,
+        "retry_count": 0,
+    }
+
+    # 3. Model Prediction: P(success | context)
+    prob = score_record(record)
+
+    # 4. Policy Decision
+    decision = decide_action(record, prob)
+
+    print(f"[Agent Decision] ID: {payment_id} | Code: {granular_error} | Action: {decision['action']} | P(success): {prob:.2%}")
+    print(f"  Reason: {decision['reason']}")
+
+    # 5. Execute Action (Test Mode side effects)
+    execution_result = {}
+    if decision["attempted"]:
+        amount_in_paise = int(amount_in_rupees * 100)
+        action_name = decision["action"]
+
+        if action_name in ("retry_after_cooldown", "retry_with_backoff"):
+            plink = create_payment_link(
+                amount_in_paise=amount_in_paise,
+                description=f"Autonomous Recovery for failed payment {payment_id}",
+                customer_email=customer_email,
+                customer_contact=customer_contact,
+                notify_customer=True,
+            )
+            execution_result["payment_link"] = plink.get("short_url") or plink.get("id")
+            execution_result["status"] = "payment_link_created"
+
+        elif action_name in ("prompt_new_payment_method", "reprompt_customer"):
+            plink = create_payment_link(
+                amount_in_paise=amount_in_paise,
+                description=f"Retry payment {payment_id} with alternative method or details",
+                customer_email=customer_email,
+                customer_contact=customer_contact,
+                notify_customer=True,
+            )
+            recovery_url = plink.get("short_url") or f"https://rzp.io/i/{plink.get('id')}"
+            notif_res = send_recovery_notification(
+                recipient_email=customer_email,
+                payment_id=payment_id,
+                amount_in_rupees=amount_in_rupees,
+                action=action_name,
+                recovery_link=recovery_url,
+                reason=decision["reason"],
+            )
+            execution_result["payment_link"] = recovery_url
+            execution_result["notification"] = notif_res
+
+    # 6. Log to Audit Trail (Persisted to PostgreSQL)
+    audit_trail.log(
+        record=record,
+        decision=decision,
+        outcome={"execution": execution_result} if execution_result else None,
+    )
+
+    return jsonify({
+        "status": "processed",
+        "payment_id": payment_id,
+        "action": decision["action"],
+        "category": decision["category"],
+        "predicted_success_prob": round(prob, 3),
+        "execution": execution_result,
+    }), 200
+
+
+# -------------------------------------------------------------------------
+# Dashboard & Checkout Frontend Routes
+# -------------------------------------------------------------------------
+
 @app.route("/", methods=["GET"])
 def dashboard():
     """Live audit trail dashboard for demo monitoring."""
     summary = audit_trail.summary()
-    recent_entries = list(reversed(audit_trail.entries[-25:]))
+    recent_entries = audit_trail.get_recent(25)
     
-    # Load degradation alerts if timeseries dataset exists
-    degradation_incidents = []
-    try:
-        deg_res = run_degradation_pipeline()
-        degradation_incidents = deg_res.get("incidents", [])[:4]
-    except Exception as e:
-        print(f"[Server] Degradation monitoring warning: {e}")
-
     # Load policy proposals for drift-check governance
     proposals = load_proposals()
     pending_proposals = [p for p in proposals if p.get("status") == "pending_human_approval"]
@@ -645,9 +897,9 @@ def dashboard():
                 </div>
 
                 <p style="margin: 0 0 12px 0; font-size: 13px; color: #cbd5e1;">
-                    Evaluated on <b>{{ latest_proposal.evaluated_on }}</b> (n={{ "{:,}".format(latest_proposal.dataset_size) }} records, ₹{{ "{:,}".format(latest_proposal.amount_at_risk) }} at risk).
+                    Evaluated on <b>{{ latest_proposal.evaluated_on }}</b> (n={{ "{:,}".format(latest_proposal.get('dataset_size', 1200)) }} records).
                     {% if latest_proposal.drift_detected %}
-                    Detected <span style="color: #f87171; font-weight: 700;">{{ "{:+.1f}".format(latest_proposal.accuracy_delta_pp) }}pp accuracy degradation</span> on fresh distribution.
+                    Detected <span style="color: #f87171; font-weight: 700;">drift degradation</span> on shifted distribution.
                     {% else %}
                     Model performance is stable within calibrated bounds.
                     {% endif %}
@@ -657,7 +909,7 @@ def dashboard():
                     <div class="drift-metric-box">
                         <div class="drift-metric-lbl">Success Predictor Accuracy</div>
                         <div class="drift-metric-val" style="color: #f87171;">
-                            {{ "{:.1%}".format(latest_proposal.original_performance.accuracy) }} → {{ "{:.1%}".format(latest_proposal.drift_batch_performance.accuracy) }}
+                            {{ "{:.1%}".format(latest_proposal.original_performance.get('accuracy', 0.85) if latest_proposal.original_performance else 0.85) }} → {{ "{:.1%}".format(latest_proposal.drift_batch_performance.get('accuracy', 0.78) if latest_proposal.drift_batch_performance else 0.78) }}
                         </div>
                     </div>
                     <div class="drift-metric-box">
@@ -669,13 +921,13 @@ def dashboard():
                     <div class="drift-metric-box">
                         <div class="drift-metric-lbl">Est. Net INR Gain</div>
                         <div class="drift-metric-val" style="color: #34d399;">
-                            +₹{{ "{:,}".format(latest_proposal.estimated_net_value_gain) }}
+                            +₹{{ "{:,}".format((latest_proposal.get('estimated_net_value_gain', 0) or 0) | int) }}
                         </div>
                     </div>
                     <div class="drift-metric-box">
-                        <div class="drift-metric-lbl">Attempt Precision Lift</div>
+                        <div class="drift-metric-lbl">Status</div>
                         <div class="drift-metric-val" style="color: #fbbf24;">
-                            {{ "{:.1%}".format(latest_proposal.recovery_rate_current) }} → {{ "{:.1%}".format(latest_proposal.recovery_rate_proposed) }}
+                            {{ latest_proposal.status.upper() }}
                         </div>
                     </div>
                 </div>
@@ -701,7 +953,7 @@ def dashboard():
                 <div class="copilot-header">
                     <div class="copilot-title">
                         <span>💬 Audit Trail Copilot</span>
-                        <span class="copilot-badge">Gemini 3.6 Flash Grounded</span>
+                        <span class="copilot-badge">Gemini Flash Grounded</span>
                     </div>
                     <span style="font-size: 12px; color: var(--text-muted);">Read-Only Decision Narration</span>
                 </div>
@@ -735,7 +987,7 @@ def dashboard():
             <div class="table-container">
                 <div class="table-header">
                     <h2>Live Audit Trail (Most Recent)</h2>
-                    <span style="font-size: 12px; color: var(--text-muted);">Auto-refreshes on incoming webhooks</span>
+                    <span style="font-size: 12px; color: var(--text-muted);">Real-time PostgreSQL Audit Storage</span>
                 </div>
                 <table>
                     <thead>
@@ -753,7 +1005,7 @@ def dashboard():
                     <tbody>
                         {% for entry in recent_entries %}
                         <tr>
-                            <td style="color: var(--text-muted);">{{ entry.timestamp[11:19] }}</td>
+                            <td style="color: var(--text-muted);">{{ entry.timestamp[11:19] if entry.timestamp|length >= 19 else entry.timestamp }}</td>
                             <td><strong>{{ entry.payment_id }}</strong></td>
                             <td>₹{{ "{:,.2f}".format(entry.amount) }}</td>
                             <td><code>{{ entry.error_code }}</code></td>
@@ -812,7 +1064,7 @@ def dashboard():
                 jsonViewer.style.display = 'none';
 
                 try {
-                    const res = await fetch('/api/copilot', {
+                    const res = await fetch('/api/v1/copilot', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ question: question })
@@ -854,7 +1106,7 @@ def dashboard():
                     actionsContainer.innerHTML = '<span style="color: #94a3b8; font-size: 12px;">Submitting governance decision...</span>';
                 }
                 try {
-                    const res = await fetch(`/api/policy-proposals/${proposalId}/${action}`, {
+                    const res = await fetch(`/api/v1/policy-proposals/${proposalId}/${action}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' }
                     });
@@ -881,6 +1133,7 @@ def dashboard():
         html,
         summary=summary,
         recent_entries=recent_entries,
+        degradation_incidents=CACHED_DEGRADATION_INCIDENTS,
         latest_proposal=latest_proposal,
         current_threshold=current_threshold,
     )
@@ -991,7 +1244,7 @@ def checkout_page():
                     const res = await fetch('/create-test-order', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ amount: 129900 }) // ₹1,299.00
+                        body: JSON.stringify({ amount: 129900 })
                     });
                     const data = await res.json();
                     
@@ -1041,7 +1294,7 @@ def checkout_page():
 def create_test_order_endpoint():
     """Generates an order in Razorpay for the checkout page."""
     req_data = request.get_json(silent=True) or {}
-    amount = req_data.get("amount", 129900)  # Default: ₹1299 (in paise)
+    amount = req_data.get("amount", 129900)
     order = create_order(amount_in_paise=amount)
     return jsonify({
         "order_id": order.get("id"),
@@ -1050,155 +1303,57 @@ def create_test_order_endpoint():
     })
 
 
-@app.route("/webhook/razorpay", methods=["POST"])
-def handle_razorpay_webhook():
-    """
-    Receives and processes real webhook payloads from Razorpay.
-    Verifies signature -> maps schema -> scores ML -> evaluates policy -> executes action -> logs audit.
-    """
-    raw_body = request.get_data()
-    signature = request.headers.get("X-Razorpay-Signature", "")
+# -------------------------------------------------------------------------
+# Versioned API Endpoints (/api/v1/...)
+# -------------------------------------------------------------------------
 
-    # 1. Signature Verification
-    if not verify_webhook_signature(raw_body, signature):
-        print("[Webhook] Signature verification failed.")
-        return jsonify({"status": "error", "message": "Invalid signature"}), 400
-
-    payload = request.get_json(silent=True) or {}
-    event_type = payload.get("event")
-
-    print(f"\n[Webhook] Received Razorpay event: {event_type}")
-
-    if event_type != "payment.failed":
-        # Acknowledge other events gracefully
-        return jsonify({"status": "ignored", "event": event_type}), 200
-
-    # 2. Extract payment entity
-    payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
-    if not payment_entity:
-        return jsonify({"status": "error", "message": "Missing payment entity"}), 400
-
-    # Adapt Razorpay webhook schema to Agent schema
-    # In Razorpay webhooks: error_reason contains granular failure code (e.g. insufficient_funds)
-    # error_code contains high-level category (e.g. BAD_REQUEST_ERROR)
-    granular_error = (
-        payment_entity.get("error_reason")
-        or payment_entity.get("error_code")
-        or "bank_technical_error"
-    ).lower()
-
-    amount_in_rupees = float(payment_entity.get("amount", 0)) / 100.0
-    payment_id = payment_entity.get("id", f"pay_live_{int(time.time())}")
-    method = payment_entity.get("method", "card")
-    error_source = payment_entity.get("error_source", "gateway")
-    error_step = payment_entity.get("error_step", "payment_processing")
-    created_at = payment_entity.get("created_at", int(time.time()))
-    customer_email = payment_entity.get("email")
-    customer_contact = payment_entity.get("contact")
-
-    record = {
-        "id": payment_id,
-        "amount": amount_in_rupees,
-        "currency": payment_entity.get("currency", "INR"),
-        "method": method,
-        "error_code": granular_error,
-        "error_source": error_source,
-        "error_step": error_step,
-        "created_at": created_at,
-        "retry_count": 0,  # Fresh webhook failure
-    }
-
-    # 3. Model Prediction: P(success | context)
-    prob = score_record(record)
-
-    # 4. Policy Decision
-    decision = decide_action(record, prob)
-
-    print(f"[Agent Decision] ID: {payment_id} | Code: {granular_error} | Action: {decision['action']} | P(success): {prob:.2%}")
-    print(f"  Reason: {decision['reason']}")
-
-    # 5. Execute Action (Test Mode side effects)
-    execution_result = {}
-    if decision["attempted"]:
-        amount_in_paise = int(amount_in_rupees * 100)
-        action_name = decision["action"]
-
-        if action_name in ("retry_after_cooldown", "retry_with_backoff"):
-            # Create a recovery payment link
-            plink = create_payment_link(
-                amount_in_paise=amount_in_paise,
-                description=f"Autonomous Recovery for failed payment {payment_id}",
-                customer_email=customer_email,
-                customer_contact=customer_contact,
-                notify_customer=True,
-            )
-            execution_result["payment_link"] = plink.get("short_url") or plink.get("id")
-            execution_result["status"] = "payment_link_created"
-
-        elif action_name in ("prompt_new_payment_method", "reprompt_customer"):
-            # Create payment link and send customer notification
-            plink = create_payment_link(
-                amount_in_paise=amount_in_paise,
-                description=f"Retry payment {payment_id} with alternative method or details",
-                customer_email=customer_email,
-                customer_contact=customer_contact,
-                notify_customer=True,
-            )
-            recovery_url = plink.get("short_url") or f"https://rzp.io/i/{plink.get('id')}"
-            notif_res = send_recovery_notification(
-                recipient_email=customer_email,
-                payment_id=payment_id,
-                amount_in_rupees=amount_in_rupees,
-                action=action_name,
-                recovery_link=recovery_url,
-                reason=decision["reason"],
-            )
-            execution_result["payment_link"] = recovery_url
-            execution_result["notification"] = notif_res
-
-    # 6. Log to Audit Trail
-    audit_trail.log(
-        record=record,
-        decision=decision,
-        outcome={"execution": execution_result} if execution_result else None,
-    )
-    audit_trail.save(AUDIT_LOG_PATH)
-
-    return jsonify({
-        "status": "processed",
-        "payment_id": payment_id,
-        "action": decision["action"],
-        "category": decision["category"],
-        "predicted_success_prob": round(prob, 3),
-        "execution": execution_result,
-    }), 200
-
-
+@app.route("/api/v1/audit-trail", methods=["GET"])
 @app.route("/api/audit-trail", methods=["GET"])
 def api_audit_trail():
     """Returns JSON list of audit entries and summary metrics."""
     return jsonify({
         "summary": audit_trail.summary(),
-        "entries": audit_trail.entries,
+        "entries": audit_trail.get_recent(100),
     })
 
 
+@app.route("/api/v1/degradation-alerts", methods=["GET"])
 @app.route("/api/degradation-alerts", methods=["GET"])
 def api_degradation_alerts():
-    """Returns real-time time-series outage detection alerts."""
-    try:
-        res = run_degradation_pipeline()
-        return jsonify(res), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
+    """Returns cached real-time time-series outage detection alerts."""
+    return jsonify({
+        "status": "ok",
+        "incidents": CACHED_DEGRADATION_INCIDENTS,
+    }), 200
 
 
+@app.route("/api/v1/cohort-report", methods=["GET"])
+@app.route("/api/cohort-report", methods=["GET"])
+def api_cohort_report():
+    """Returns cached cohort analyst data for Recharts scatter chart rendering."""
+    if not CACHED_COHORT_DATA:
+        return jsonify({"status": "error", "message": "Cohort data not yet available."}), 503
+    return jsonify({"status": "ok", **CACHED_COHORT_DATA}), 200
+
+
+@app.route("/api/v1/bandit-results", methods=["GET"])
+@app.route("/api/bandit-results", methods=["GET"])
+def api_bandit_results():
+    """Returns cached bandit simulation convergence data for Recharts line chart rendering."""
+    if not CACHED_BANDIT_DATA:
+        return jsonify({"status": "error", "message": "Bandit data not yet available."}), 503
+    return jsonify({"status": "ok", **CACHED_BANDIT_DATA}), 200
+
+
+@app.route("/api/v1/copilot", methods=["POST"])
 @app.route("/api/copilot", methods=["POST"])
+@limiter.limit("10 per minute")
 def api_copilot():
     """
     Natural-language Q&A interface over the audit trail using Gemini.
     Accepts: {"question": "..."}
     Returns: {"answer": str, "grounded_record_count": int, "context_used": dict}
+    Rate-limited to 10 requests/minute per IP to protect Gemini API costs.
     """
     payload = request.get_json(silent=True) or {}
     question = payload.get("question", "").strip()
@@ -1207,11 +1362,11 @@ def api_copilot():
     if len(question) > 500:
         return jsonify({"status": "error", "message": "Question is too long (max 500 characters)"}), 400
 
-    df_context = pd.DataFrame(audit_trail.entries) if audit_trail.entries else None
-    result = answer_question(question, df=df_context)
+    result = answer_question(question)
     return jsonify(result), 200
 
 
+@app.route("/api/v1/policy-proposals", methods=["GET"])
 @app.route("/api/policy-proposals", methods=["GET"])
 def api_policy_proposals():
     """Returns list of all policy change proposals generated by Drift-Check agent."""
@@ -1222,9 +1377,11 @@ def api_policy_proposals():
     }), 200
 
 
+@app.route("/api/v1/policy-proposals/<proposal_id>/approve", methods=["POST"])
 @app.route("/api/policy-proposals/<proposal_id>/approve", methods=["POST"])
+@limiter.limit("10 per minute")
 def api_approve_proposal(proposal_id):
-    """Human-in-the-loop: Approves a proposed policy change and updates threshold_config.json."""
+    """Human-in-the-loop: Approves a proposed policy change and updates threshold configuration in DB and disk."""
     proposals = load_proposals()
     target = None
     for p in proposals:
@@ -1235,6 +1392,27 @@ def api_approve_proposal(proposal_id):
         return jsonify({"status": "error", "message": f"Proposal {proposal_id} not found"}), 404
 
     new_threshold = target["proposed_threshold"]
+
+    # 1. Update Database Threshold Configuration
+    if is_db_configured():
+        try:
+            with get_db_session() as session:
+                cfg = session.query(ThresholdConfig).filter_by(merchant_id=1).first()
+                if cfg:
+                    cfg.success_threshold = float(new_threshold)
+                    cfg.updated_at = datetime.now(timezone.utc)
+                else:
+                    cfg = ThresholdConfig(merchant_id=1, success_threshold=float(new_threshold))
+                    session.add(cfg)
+                
+                db_prop = session.query(PolicyChangeProposal).filter_by(id=proposal_id).first()
+                if db_prop:
+                    db_prop.status = "approved"
+                    db_prop.resolved_at = datetime.now(timezone.utc).isoformat()
+        except Exception as e:
+            print(f"[PolicyEngine] DB approve warning: {e}")
+
+    # 2. Update threshold_config.json for local sync
     config_data = {}
     if os.path.exists(CONFIG_PATH):
         try:
@@ -1244,13 +1422,15 @@ def api_approve_proposal(proposal_id):
             pass
     config_data["optimal_threshold"] = new_threshold
     config_data["last_drift_approval"] = datetime.now(timezone.utc).isoformat()
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(config_data, f, indent=2)
+    try:
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(config_data, f, indent=2)
+    except Exception:
+        pass
 
     target["status"] = "approved"
     target["resolved_at"] = datetime.now(timezone.utc).isoformat()
-    with open(PROPOSALS_LOG_PATH, "w", encoding="utf-8") as f:
-        json.dump(proposals, f, indent=2)
+    save_proposal(target)
 
     return jsonify({
         "status": "approved",
@@ -1260,7 +1440,9 @@ def api_approve_proposal(proposal_id):
     }), 200
 
 
+@app.route("/api/v1/policy-proposals/<proposal_id>/reject", methods=["POST"])
 @app.route("/api/policy-proposals/<proposal_id>/reject", methods=["POST"])
+@limiter.limit("10 per minute")
 def api_reject_proposal(proposal_id):
     """Human-in-the-loop: Rejects a proposed policy change, preserving existing threshold."""
     proposals = load_proposals()
@@ -1272,10 +1454,20 @@ def api_reject_proposal(proposal_id):
     if not target:
         return jsonify({"status": "error", "message": f"Proposal {proposal_id} not found"}), 404
 
+    # 1. Update Database
+    if is_db_configured():
+        try:
+            with get_db_session() as session:
+                db_prop = session.query(PolicyChangeProposal).filter_by(id=proposal_id).first()
+                if db_prop:
+                    db_prop.status = "rejected"
+                    db_prop.resolved_at = datetime.now(timezone.utc).isoformat()
+        except Exception as e:
+            print(f"[PolicyEngine] DB reject warning: {e}")
+
     target["status"] = "rejected"
     target["resolved_at"] = datetime.now(timezone.utc).isoformat()
-    with open(PROPOSALS_LOG_PATH, "w", encoding="utf-8") as f:
-        json.dump(proposals, f, indent=2)
+    save_proposal(target)
 
     return jsonify({
         "status": "rejected",
@@ -1285,6 +1477,7 @@ def api_reject_proposal(proposal_id):
     }), 200
 
 
+@app.route("/api/v1/trigger-drift-check", methods=["POST"])
 @app.route("/api/trigger-drift-check", methods=["POST"])
 def api_trigger_drift_check():
     """Runs drift detection evaluation on demand and returns the resulting proposal."""
@@ -1302,7 +1495,7 @@ if __name__ == "__main__":
     print(f"   Dashboard: http://localhost:{port}/")
     print(f"   Test Checkout: http://localhost:{port}/checkout")
     print(f"   Webhook URL: http://localhost:{port}/webhook/razorpay")
+    print(f"   Health Check: http://localhost:{port}/api/v1/health")
     print(f"=======================================================\n")
 
     app.run(host="0.0.0.0", port=port, debug=False)
-

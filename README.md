@@ -6,7 +6,8 @@
 
 Built for Razorpay merchants, this system pairs strict deterministic compliance gates with **6 specialized AI/ML models** and **2 governance/narration layers (8 cohesive components)** to maximize net recovered revenue while eliminating wasted retry spend, spamming, and customer friction.
 
-**Repository**: [https://github.com/ayushcode001/razorpay-recovery-agent](https://github.com/ayushcode001/razorpay-recovery-agent)
+**Repository**: [https://github.com/ayushcode001/razorpay-recovery-agent](https://github.com/ayushcode001/razorpay-recovery-agent)  
+**Live Demo Deployment**: [https://razorpay-recovery-agent.onrender.com](https://razorpay-recovery-agent.onrender.com) *(Protected by HTTP Basic Auth; credentials shared separately. Deployed on Render with Managed PostgreSQL, build-time model serialization, and automated GitHub Actions keep-alive).*
 
 ---
 

@@ -22,10 +22,10 @@ load_dotenv()
 from agent.copilot_context import build_context, load_audit_trail
 
 CANDIDATE_MODELS = [
-    os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
-    "gemini-flash-latest",
+    os.getenv("GEMINI_MODEL", "gemini-3.6-flash"),
     "gemini-3.6-flash",
-    "gemini-3.7-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-3-flash-preview",
 ]
 
 SYSTEM_PROMPT = """You explain decisions made by an autonomous payment recovery agent, using ONLY the JSON context provided below. Never state a number, count, or fact that isn't present in the context. If the question asks about something not covered by the context, say so plainly rather than guessing. You cannot take any action — you can only explain past decisions. If asked to perform an action (approve, retry, refund, change a setting), decline and explain that you're a read-only explanation layer. Always respond in English only, regardless of the language of the question or any names, terms, or values in the data."""

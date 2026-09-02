@@ -5,7 +5,7 @@ Pure Python/pandas retrieval:
   - Bounded context construction
   - Exact payment ID lookup
   - Vocabulary-constrained keyword filtering (no free-text leaking)
-  - Grounded summary statistics reusing AuditTrail logic
+  - Grounded summary statistics querying PostgreSQL / AuditTrail logic
 """
 
 import os
@@ -19,6 +19,8 @@ DEFAULT_AUDIT_PATH = os.path.join(PROJECT_ROOT, "audit_logs", "audit_trail.json"
 
 from agent.taxonomy import ERROR_CODE_TAXONOMY, CATEGORY_POLICY
 from agent.audit import AuditTrail
+from agent.db import is_db_configured, get_db_session
+from agent.db_models import AuditTrailEntry
 
 # Build the closed known vocabulary for filtering
 KNOWN_ERROR_CODES = set(ERROR_CODE_TAXONOMY.keys())
@@ -27,16 +29,35 @@ KNOWN_ACTIONS = {p["action"] for p in CATEGORY_POLICY.values()} | {"skipped_low_
 KNOWN_VOCABULARY = KNOWN_ERROR_CODES | KNOWN_CATEGORIES | KNOWN_ACTIONS
 
 
-def load_audit_trail(path: Optional[str] = None) -> pd.DataFrame:
-    """Loads audit trail from JSON file into a pandas DataFrame."""
+def load_audit_trail(path: Optional[str] = None, merchant_id: int = 1) -> pd.DataFrame:
+    """Loads audit trail from PostgreSQL (or JSON fallback) into a pandas DataFrame."""
+    if is_db_configured():
+        try:
+            with get_db_session() as session:
+                rows = (
+                    session.query(AuditTrailEntry)
+                    .filter_by(merchant_id=merchant_id)
+                    .order_by(AuditTrailEntry.id.desc())
+                    .limit(500)
+                    .all()
+                )
+                if rows:
+                    records = [r.to_dict() for r in rows]
+                    return pd.DataFrame(records)
+        except Exception as e:
+            print(f"[CopilotContext] DB read warning: {e}")
+
     audit_path = path or DEFAULT_AUDIT_PATH
     if not os.path.exists(audit_path):
         return pd.DataFrame()
-    with open(audit_path, "r", encoding="utf-8") as f:
-        records = json.load(f)
-    if not records:
+    try:
+        with open(audit_path, "r", encoding="utf-8") as f:
+            records = json.load(f)
+        if not records:
+            return pd.DataFrame()
+        return pd.DataFrame(records)
+    except Exception:
         return pd.DataFrame()
-    return pd.DataFrame(records)
 
 
 def compute_summary_stats(df: pd.DataFrame) -> Dict[str, Any]:
@@ -95,7 +116,6 @@ def find_payment_by_id(df: pd.DataFrame, payment_id: str) -> Optional[Dict[str, 
     matches = df[df["payment_id"] == payment_id]
     if matches.empty:
         return None
-    # Return the first matching record as a clean dictionary
     return matches.iloc[0].to_dict()
 
 
@@ -136,9 +156,7 @@ def extract_matched_keywords(text: str) -> List[str]:
     """Finds words or tokens in query that match the closed domain vocabulary."""
     text_lower = text.lower()
     found = []
-    # Check multi-word or single-word known terms
     for term in sorted(KNOWN_VOCABULARY, key=len, reverse=True):
-        # Match as word boundary or exact token
         pattern = r"(?:\b|_)" + re.escape(term) + r"(?:\b|_)"
         if re.search(pattern, text_lower) or term in text_lower:
             found.append(term)
@@ -168,7 +186,6 @@ def build_context(question: str, df: Optional[pd.DataFrame] = None) -> Dict[str,
     keywords = extract_matched_keywords(question)
     filtered_records = []
     if keywords and not payment_record:
-        # Fetch bounded records for the most specific recognized keyword
         filtered_records = filter_by_keyword(df, keywords[0], max_results=20)
 
     grounded_count = 0

@@ -16,7 +16,7 @@ import json
 import numpy as np
 import pandas as pd
 from datetime import datetime, timezone
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, List, Tuple
 from sklearn.metrics import classification_report, accuracy_score, precision_score, recall_score
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -32,6 +32,8 @@ from agent.success_predictor import (
     FEATURE_COLUMNS_CAT,
 )
 from agent.threshold_tuner import simulate_policy_outcomes
+from agent.db import is_db_configured, get_db_session
+from agent.db_models import PolicyChangeProposal
 
 ORIGINAL_DATA_PATH = os.path.join(PROJECT_ROOT, "data", "synthetic_failed_payments.json")
 DRIFT_DATA_PATH = os.path.join(PROJECT_ROOT, "data", "drift_batch_30d.json")
@@ -39,8 +41,22 @@ PROPOSALS_LOG_PATH = os.path.join(PROJECT_ROOT, "audit_logs", "policy_change_pro
 CONFIG_PATH = os.path.join(PROJECT_ROOT, "agent", "threshold_config.json")
 
 
-def load_proposals(path: str = PROPOSALS_LOG_PATH) -> list:
-    """Loads existing policy change proposals from disk."""
+def load_proposals(path: str = PROPOSALS_LOG_PATH, merchant_id: int = 1) -> List[Dict[str, Any]]:
+    """Loads existing policy change proposals from DB if configured, else from disk."""
+    if is_db_configured():
+        try:
+            with get_db_session() as session:
+                rows = (
+                    session.query(PolicyChangeProposal)
+                    .filter_by(merchant_id=merchant_id)
+                    .order_by(PolicyChangeProposal.timestamp.desc())
+                    .all()
+                )
+                if rows:
+                    return [r.to_dict() for r in rows]
+        except Exception as e:
+            print(f"[DriftCheck] DB read warning: {e}")
+
     if os.path.exists(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
@@ -50,19 +66,64 @@ def load_proposals(path: str = PROPOSALS_LOG_PATH) -> list:
     return []
 
 
-def save_proposal(proposal: dict, path: str = PROPOSALS_LOG_PATH):
-    """Appends a new proposal to the proposal registry."""
-    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
-    proposals = load_proposals(path)
-    proposals.append(proposal)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(proposals, f, indent=2)
+def save_proposal(proposal: dict, path: str = PROPOSALS_LOG_PATH, merchant_id: int = 1):
+    """Saves a new proposal to the database and/or JSON registry."""
+    if is_db_configured():
+        try:
+            with get_db_session() as session:
+                proposal_id = proposal.get("proposal_id", f"prop_drift_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}")
+                existing = session.query(PolicyChangeProposal).filter_by(id=proposal_id).first()
+                if not existing:
+                    db_prop = PolicyChangeProposal(
+                        id=proposal_id,
+                        merchant_id=merchant_id,
+                        timestamp=proposal.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                        drift_detected=bool(proposal.get("drift_detected", False)),
+                        evaluated_on=str(proposal.get("evaluated_on", "simulated_drift_batch_30d")),
+                        old_model_performance=proposal.get("drift_batch_performance", {}),
+                        original_performance=proposal.get("original_performance", {}),
+                        current_threshold=float(proposal.get("current_threshold", 0.47)),
+                        proposed_threshold=float(proposal.get("proposed_threshold", 0.47)),
+                        net_value_current_threshold=float(proposal.get("net_value_current_threshold", 0)),
+                        net_value_proposed_threshold=float(proposal.get("net_value_proposed_threshold", 0)),
+                        status=str(proposal.get("status", "pending_human_approval")),
+                        note=str(proposal.get("note", "")),
+                        resolved_at=proposal.get("resolved_at"),
+                    )
+                    session.add(db_prop)
+                else:
+                    existing.status = proposal.get("status", existing.status)
+                    existing.resolved_at = proposal.get("resolved_at", existing.resolved_at)
+        except Exception as e:
+            print(f"[DriftCheck] DB write warning: {e}")
+
+    # Also keep JSON in sync if path accessible
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        proposals = []
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                proposals = json.load(f)
+        # Update or append
+        found = False
+        for i, p in enumerate(proposals):
+            if p.get("proposal_id") == proposal.get("proposal_id"):
+                proposals[i] = proposal
+                found = True
+                break
+        if not found:
+            proposals.append(proposal)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(proposals, f, indent=2)
+    except Exception as e:
+        pass
 
 
 def evaluate_drift(
     original_data_path: str = ORIGINAL_DATA_PATH,
     drift_data_path: str = DRIFT_DATA_PATH,
     accuracy_drop_threshold: float = 0.05,
+    merchant_id: int = 1,
 ) -> Dict[str, Any]:
     """
     Evaluates original model on the new drift dataset to identify performance decay.
@@ -90,7 +151,7 @@ def evaluate_drift(
     drift_detected = bool(accuracy_delta <= -accuracy_drop_threshold)
 
     # 3. Simulate current threshold policy outcomes on drift dataset
-    current_threshold = get_success_prob_threshold()
+    current_threshold = get_success_prob_threshold(merchant_id)
     current_policy_res = simulate_policy_outcomes(df_drift, probs_drift, current_threshold)
 
     # 4. If drift detected, search for optimal new threshold on drift batch
@@ -98,20 +159,19 @@ def evaluate_drift(
     proposed_policy_res = current_policy_res
     net_value_impact = 0
 
-    if drift_detected or True:  # Compute grid search to find optimal threshold for new distribution
-        threshold_candidates = [round(t, 2) for t in np.arange(0.20, 0.85, 0.01)]
-        best_t = current_threshold
-        best_net = -float("inf")
+    threshold_candidates = [round(t, 2) for t in np.arange(0.20, 0.85, 0.01)]
+    best_t = current_threshold
+    best_net = -float("inf")
 
-        for t in threshold_candidates:
-            res = simulate_policy_outcomes(df_drift, probs_drift, t)
-            if res["net_value"] > best_net:
-                best_net = res["net_value"]
-                best_t = t
+    for t in threshold_candidates:
+        res = simulate_policy_outcomes(df_drift, probs_drift, t)
+        if res["net_value"] > best_net:
+            best_net = res["net_value"]
+            best_t = t
 
-        proposed_threshold = best_t
-        proposed_policy_res = simulate_policy_outcomes(df_drift, probs_drift, proposed_threshold)
-        net_value_impact = proposed_policy_res["net_value"] - current_policy_res["net_value"]
+    proposed_threshold = best_t
+    proposed_policy_res = simulate_policy_outcomes(df_drift, probs_drift, proposed_threshold)
+    net_value_impact = proposed_policy_res["net_value"] - current_policy_res["net_value"]
 
     proposal_id = f"prop_drift_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
 
@@ -146,8 +206,8 @@ def evaluate_drift(
         "note": "Evaluated on a simulated 30-day-later batch with a deliberately shifted error distribution, not observed production drift.",
     }
 
-    # Save to immutable audit registry
-    save_proposal(proposal)
+    # Save to database and JSON registry
+    save_proposal(proposal, merchant_id=merchant_id)
 
     return proposal
 

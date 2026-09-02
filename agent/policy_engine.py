@@ -2,6 +2,7 @@
 Decides the bounded action for a failed payment by combining:
   1. Deterministic taxonomy (is auto-retry even allowed for this error?)
   2. Learned success probability (is it WORTH attempting, given context?)
+  3. Causal Uplift gate (does intervention produce positive incremental lift?)
 
 This is the "every money action explainable, bounded and gated" piece.
 Every decision returns a reason string suitable for the audit trail.
@@ -10,36 +11,69 @@ Every decision returns a reason string suitable for the audit trail.
 import json
 import os
 from agent.taxonomy import category_for, policy_for_category
+from agent.db import is_db_configured, get_db_session
+from agent.db_models import ThresholdConfig
 
 _CONFIG_PATH = os.path.join(os.path.dirname(__file__), "threshold_config.json")
 
-def get_success_prob_threshold() -> float:
-    """Loads tuned threshold if threshold_config.json exists, otherwise defaults to 0.40."""
+
+def get_success_prob_threshold(merchant_id: int = 1) -> float:
+    """Loads tuned threshold from DB if configured, else from threshold_config.json, else 0.40."""
+    if is_db_configured():
+        try:
+            with get_db_session() as session:
+                cfg = session.query(ThresholdConfig).filter_by(merchant_id=merchant_id).first()
+                if cfg and cfg.success_threshold is not None:
+                    return float(cfg.success_threshold)
+        except Exception:
+            pass
+
     if os.path.exists(_CONFIG_PATH):
         try:
-            with open(_CONFIG_PATH, "r") as f:
+            with open(_CONFIG_PATH, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
                 return float(cfg.get("optimal_threshold", 0.40))
         except Exception:
             pass
     return 0.40
 
-# Threshold source of truth: threshold_config.json (tuned to 0.47 via 5-seed cross-validation)
-SUCCESS_PROB_THRESHOLD = get_success_prob_threshold()  # below this (0.47), don't burn an attempt -- escalate instead
-UPLIFT_THRESHOLD = 0.05  # below this, intervention adds negligible causal lift; skip to avoid wasted cost
+
+def get_uplift_threshold(merchant_id: int = 1) -> float:
+    """Loads uplift threshold from DB if configured, else defaults to 0.05."""
+    if is_db_configured():
+        try:
+            with get_db_session() as session:
+                cfg = session.query(ThresholdConfig).filter_by(merchant_id=merchant_id).first()
+                if cfg and cfg.uplift_gate_threshold is not None:
+                    return float(cfg.uplift_gate_threshold)
+        except Exception:
+            pass
+    return 0.05
 
 
+# Backward-compatible constant aliases
+SUCCESS_PROB_THRESHOLD = get_success_prob_threshold()
+UPLIFT_THRESHOLD = 0.05
 
-def decide_action(record: dict, predicted_success_prob: float, estimated_uplift: float | None = None) -> dict:
+
+def decide_action(
+    record: dict,
+    predicted_success_prob: float,
+    estimated_uplift: float | None = None,
+    merchant_id: int = 1,
+) -> dict:
     """
     Returns a decision dict: action, attempted, reason, category, predicted_success_prob, estimated_uplift.
     
     Decision pipeline:
       1. Deterministic Taxonomy Gate (risk/compliance never auto-actioned)
-      2. Success Probability Gate (P >= SUCCESS_PROB_THRESHOLD)
+      2. Success Probability Gate (P >= current_success_threshold)
       3. Retry Budget Gate (retry_count < max_retries)
-      4. Causal Uplift Gate (estimated_uplift >= UPLIFT_THRESHOLD if provided)
+      4. Causal Uplift Gate (estimated_uplift >= uplift_threshold if provided)
     """
+    success_threshold = get_success_prob_threshold(merchant_id)
+    uplift_threshold = get_uplift_threshold(merchant_id)
+
     error_code = record["error_code"]
     category = category_for(error_code)
     policy = policy_for_category(category)
@@ -58,7 +92,7 @@ def decide_action(record: dict, predicted_success_prob: float, estimated_uplift:
             ),
         }
 
-    if predicted_success_prob < SUCCESS_PROB_THRESHOLD:
+    if predicted_success_prob < success_threshold:
         return {
             "category": category,
             "action": "escalate_to_human",
@@ -67,7 +101,7 @@ def decide_action(record: dict, predicted_success_prob: float, estimated_uplift:
             "estimated_uplift": estimated_uplift,
             "reason": (
                 f"Predicted success probability {predicted_success_prob:.2f} is below "
-                f"threshold {SUCCESS_PROB_THRESHOLD}. Stopping rule triggered: not worth "
+                f"threshold {success_threshold:.2f}. Stopping rule triggered: not worth "
                 f"burning an attempt (and the retry/notification cost that comes with it). "
                 f"Escalated instead of acting blindly."
             ),
@@ -87,7 +121,7 @@ def decide_action(record: dict, predicted_success_prob: float, estimated_uplift:
         }
 
     # Uplift Refinement Layer: If uplift model is active and predicts negligible lift over self-recovery
-    if estimated_uplift is not None and estimated_uplift < UPLIFT_THRESHOLD:
+    if estimated_uplift is not None and estimated_uplift < uplift_threshold:
         return {
             "category": category,
             "action": "skipped_low_uplift",
@@ -96,7 +130,7 @@ def decide_action(record: dict, predicted_success_prob: float, estimated_uplift:
             "estimated_uplift": estimated_uplift,
             "reason": (
                 f"P(success)={predicted_success_prob:.2f} clears threshold, but estimated "
-                f"uplift is only {estimated_uplift:.3f} (< {UPLIFT_THRESHOLD:.2f}). Customer is likely to self-recover; "
+                f"uplift is only {estimated_uplift:.3f} (< {uplift_threshold:.2f}). Customer is likely to self-recover; "
                 f"intervention skipped to avoid wasted cost."
             ),
         }
@@ -111,7 +145,7 @@ def decide_action(record: dict, predicted_success_prob: float, estimated_uplift:
         "reason": (
             f"error_code='{error_code}' -> category='{category}'. Predicted success "
             f"probability {predicted_success_prob:.2f} clears threshold "
-            f"({SUCCESS_PROB_THRESHOLD}){uplift_str} and retry budget available. Executing "
+            f"({success_threshold:.2f}){uplift_str} and retry budget available. Executing "
             f"'{policy['action']}'."
         ),
     }
