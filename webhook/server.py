@@ -46,6 +46,7 @@ from agent.retry_bandit import run_bandit_simulation, ARMS, CATEGORIES
 from agent.copilot import answer_question
 from agent.drift_check import load_proposals, save_proposal, evaluate_drift, PROPOSALS_LOG_PATH, CONFIG_PATH
 from agent.db import is_db_configured, get_db_session
+from scripts.init_db import init_database
 from agent.db_models import ThresholdConfig, PolicyChangeProposal
 from webhook.razorpay_client import (
     RAZORPAY_KEY_ID,
@@ -56,6 +57,12 @@ from webhook.razorpay_client import (
 from webhook.notifier import send_recovery_notification
 
 load_dotenv()
+
+# Initialize DB tables automatically on app startup
+try:
+    init_database()
+except Exception as e:
+    print(f"[Agent Server] Warning: Could not auto-initialize DB tables: {e}")
 
 app = Flask(__name__)
 
