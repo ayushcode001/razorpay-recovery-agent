@@ -3,6 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from '@/api/client'
+import { FALLBACK_COHORT_DATA, FALLBACK_BANDIT_DATA } from '@/data/fallbackStats'
 
 // --- Types ---
 
@@ -156,7 +157,15 @@ export function useCohortReport() {
         total_at_risk: number
         non_trivial_passed: boolean
       }>('/api/v1/cohort-report'),
-    staleTime: Infinity, // Static data — doesn't change between requests
+    initialData: FALLBACK_COHORT_DATA as unknown as {
+      status: string
+      cohorts: CohortSummary[]
+      scatter_by_cluster: Record<string, ScatterPoint[]>
+      pca_variance_ratio: number[]
+      total_at_risk: number
+      non_trivial_passed: boolean
+    },
+    staleTime: 60_000,
   })
 }
 
@@ -170,7 +179,13 @@ export function useBanditResults() {
         arms: { index: number; name: string; minutes: number; desc: string }[]
         results: Record<string, BanditCategoryResult>
       }>('/api/v1/bandit-results'),
-    staleTime: Infinity,
+    initialData: FALLBACK_BANDIT_DATA as unknown as {
+      status: string
+      categories: string[]
+      arms: { index: number; name: string; minutes: number; desc: string }[]
+      results: Record<string, BanditCategoryResult>
+    },
+    staleTime: 60_000,
   })
 }
 

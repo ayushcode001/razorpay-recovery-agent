@@ -13,12 +13,14 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: process.env.VITE_API_BASE_URL || 'https://razorpay-recovery-agent-rnq8.onrender.com',
         changeOrigin: true,
+        secure: false,
       },
       '/create-test-order': {
-        target: 'http://localhost:5000',
+        target: process.env.VITE_API_BASE_URL || 'https://razorpay-recovery-agent-rnq8.onrender.com',
         changeOrigin: true,
+        secure: false,
       },
     },
   },

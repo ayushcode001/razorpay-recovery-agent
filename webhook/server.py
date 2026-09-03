@@ -25,7 +25,7 @@ import json
 import joblib
 from datetime import datetime, timezone
 import pandas as pd
-from flask import Flask, request, jsonify, render_template_string, redirect, url_for, Response
+from flask import Flask, request, jsonify, render_template_string, redirect, url_for, Response, send_file
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -83,7 +83,19 @@ limiter = Limiter(
 # Authentication configuration
 DASHBOARD_USERNAME = os.getenv("DASHBOARD_USERNAME", "").strip()
 DASHBOARD_PASSWORD = os.getenv("DASHBOARD_PASSWORD", "").strip()
-UNPROTECTED_PATHS = {"/webhook/razorpay", "/api/v1/health"}
+UNPROTECTED_PATHS = {
+    "/webhook/razorpay",
+    "/api/v1/health",
+    "/api/v1/audit-trail",
+    "/api/v1/degradation-alerts",
+    "/api/v1/cohort-report",
+    "/api/v1/bandit-results",
+    "/api/v1/policy-proposals",
+    "/cohort_scatter.png",
+    "/bandit_convergence.png",
+    "/api/v1/charts/cohort-scatter.png",
+    "/api/v1/charts/bandit-convergence.png",
+}
 
 # 1. Initialize Audit Trail
 audit_trail = AuditTrail()
@@ -177,7 +189,12 @@ except Exception as e:
 @app.before_request
 def basic_auth_gate():
     """Enforces HTTP Basic Authentication on dashboard and API routes (except public webhooks & health)."""
-    if request.path in UNPROTECTED_PATHS:
+    # Always allow CORS preflight requests
+    if request.method == "OPTIONS":
+        return None
+
+    # Public webhooks, static chart images, and read-only JSON APIs
+    if request.path in UNPROTECTED_PATHS or (request.path.startswith("/api/v1/") and request.method == "GET"):
         return None
 
     if not DASHBOARD_USERNAME or not DASHBOARD_PASSWORD:
@@ -1350,6 +1367,26 @@ def api_bandit_results():
     if not CACHED_BANDIT_DATA:
         return jsonify({"status": "error", "message": "Bandit data not yet available."}), 503
     return jsonify({"status": "ok", **CACHED_BANDIT_DATA}), 200
+
+
+@app.route("/cohort_scatter.png", methods=["GET"])
+@app.route("/api/v1/charts/cohort-scatter.png", methods=["GET"])
+def serve_cohort_scatter():
+    """Serves the generated latent space PCA scatter plot PNG image."""
+    path = os.path.join(PROJECT_ROOT, "cohort_scatter.png")
+    if os.path.exists(path):
+        return send_file(path, mimetype="image/png")
+    return jsonify({"error": "Cohort scatter chart image not found"}), 404
+
+
+@app.route("/bandit_convergence.png", methods=["GET"])
+@app.route("/api/v1/charts/bandit-convergence.png", methods=["GET"])
+def serve_bandit_convergence():
+    """Serves the generated Thompson Sampling bandit convergence comparison plot PNG image."""
+    path = os.path.join(PROJECT_ROOT, "bandit_convergence.png")
+    if os.path.exists(path):
+        return send_file(path, mimetype="image/png")
+    return jsonify({"error": "Bandit convergence chart image not found"}), 404
 
 
 @app.route("/api/v1/copilot", methods=["POST"])
