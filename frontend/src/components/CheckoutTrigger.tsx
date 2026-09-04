@@ -1,4 +1,4 @@
-// CheckoutTrigger — creates a Razorpay test-mode order and opens Checkout.js modal.
+// CheckoutTrigger: creates a Razorpay test-mode order and opens Checkout.js modal.
 // Failure → user returns to dashboard → audit trail polling picks it up within 10s.
 
 import { useState } from 'react'
@@ -60,7 +60,7 @@ export function CheckoutTrigger() {
         currency: order.currency,
         order_id: order.order_id,
         name: 'Razorpay Recovery Agent',
-        description: 'Test payment — use failure card to trigger recovery flow',
+        description: 'Test payment: use failure card to trigger recovery flow',
         prefill: {
           name: 'Test User',
           email: 'test@example.com',

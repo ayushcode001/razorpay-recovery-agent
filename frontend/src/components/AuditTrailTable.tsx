@@ -1,4 +1,4 @@
-// AuditTrailTable — live-polling table of recent audit entries.
+// AuditTrailTable: live-polling table of recent audit entries.
 
 import type { AuditEntry } from '@/hooks/useApi'
 import { TableRowSkeleton, BackendConnecting } from '@/components/LoadingSkeleton'
@@ -66,7 +66,7 @@ export function AuditTrailTable({ entries, isLoading, error }: Props) {
               : entries.map((e, i) => (
                 <tr key={e.id ?? `${e.payment_id}-${i}`} className="border-b border-surface-border last:border-0 hover:bg-surface-muted/50 transition-colors">
                   <td className="px-4 py-3 font-mono text-xs text-muted whitespace-nowrap">
-                    {e.timestamp?.slice(11, 19) ?? '—'}
+                    {e.timestamp?.slice(11, 19) ?? '-'}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-navy font-medium whitespace-nowrap">
                     {e.payment_id}

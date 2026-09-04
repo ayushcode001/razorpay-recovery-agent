@@ -1,4 +1,4 @@
-// CopilotChat — Q&A over the audit trail via Gemini.
+// CopilotChat: Q&A over the audit trail via Gemini.
 // Shows grounding badge, toggleable raw context viewer.
 
 import { useState, useRef, useEffect } from 'react'
@@ -51,7 +51,7 @@ export function CopilotChat() {
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: isRateLimited
-          ? 'Rate limited — try again in a moment.'
+          ? 'Rate limited. Try again in a moment.'
           : `Error: ${msg}`,
       }])
     }

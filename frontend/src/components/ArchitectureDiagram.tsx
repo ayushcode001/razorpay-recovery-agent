@@ -1,13 +1,15 @@
-// Architecture diagram — 8-component flow layout.
+// Architecture diagram: 8-component flow layout.
 // CSS-positioned boxes with connector lines. Not ASCII, not an image.
 // Adapts the ASCII diagram from README into a styled visual flow.
+
+import { FadeIn } from './FadeIn'
 
 const COMPONENTS = [
   {
     id: 1,
     name: 'Deterministic Taxonomy',
     module: 'agent/taxonomy.py',
-    pitch: 'Safety gates & compliance boundaries — never retried.',
+    pitch: 'Safety gates & compliance boundaries. Never retried.',
     color: 'border-navy-light bg-surface-muted',
     textColor: 'text-navy',
   },
@@ -55,7 +57,7 @@ const COMPONENTS = [
     id: 7,
     name: 'Audit Trail Copilot',
     module: 'agent/copilot.py',
-    pitch: 'Gemini narration layer — read-only, zero financial action rights.',
+    pitch: 'Gemini narration layer: read-only, zero financial action rights.',
     color: 'border-primary-light bg-primary-50',
     textColor: 'text-primary-dark',
   },
@@ -63,7 +65,7 @@ const COMPONENTS = [
     id: 8,
     name: 'Drift-Check Agent',
     module: 'agent/drift_check.py',
-    pitch: 'Detects model decay, proposes threshold updates — never auto-applies.',
+    pitch: 'Detects model decay, proposes threshold updates. Never auto-applies.',
     color: 'border-danger bg-danger-light',
     textColor: 'text-danger-text',
   },
@@ -113,59 +115,71 @@ export function ArchitectureDiagram() {
   const actions = [
     { label: 'Autonomous Retry', desc: 'retry_after_cooldown / retry_with_backoff → Payment Link', color: 'border-success bg-success-light text-success-text' },
     { label: 'Customer Nudge', desc: 'prompt_new_payment_method → Payment Link + Email/SMS', color: 'border-primary-light bg-primary-50 text-primary-dark' },
-    { label: 'Escalate to Human', desc: 'Risk / compliance stop — bounded, auditable', color: 'border-danger bg-danger-light text-danger-text' },
+    { label: 'Escalate to Human', desc: 'Risk / compliance stop: bounded, auditable', color: 'border-danger bg-danger-light text-danger-text' },
   ]
   const support = COMPONENTS.slice(4)   // Degradation, Bandit, Copilot, Drift
 
   return (
     <div className="space-y-2 text-sm">
       {/* Webhook event */}
-      <div className="flex justify-center">
-        <div className="arch-node bg-navy text-white border-navy text-center px-6 py-2">
-          <div className="text-xs font-mono text-muted-lighter">Razorpay</div>
-          <div className="font-semibold text-sm">payment.failed Webhook</div>
+      <FadeIn delay={0.05} direction="up">
+        <div className="flex justify-center">
+          <div className="arch-node bg-navy text-white border-navy text-center px-6 py-2">
+            <div className="text-xs font-mono text-muted-lighter">Razorpay</div>
+            <div className="font-semibold text-sm">payment.failed Webhook</div>
+          </div>
         </div>
-      </div>
+      </FadeIn>
       <Arrow vertical />
 
       {/* Row 1: Taxonomy + Success Predictor (parallel) */}
-      <div className="flex gap-2">
-        {top.map((c) => <ArchNode key={c.id} comp={c} />)}
-      </div>
+      <FadeIn delay={0.1} direction="up">
+        <div className="flex gap-2">
+          {top.map((c) => <ArchNode key={c.id} comp={c} />)}
+        </div>
+      </FadeIn>
       <Arrow vertical />
 
       {/* Row 2: Uplift + Policy Engine */}
-      <div className="flex gap-2">
-        {mid1.map((c) => <ArchNode key={c.id} comp={c} />)}
-      </div>
+      <FadeIn delay={0.15} direction="up">
+        <div className="flex gap-2">
+          {mid1.map((c) => <ArchNode key={c.id} comp={c} />)}
+        </div>
+      </FadeIn>
       <Arrow vertical />
 
       {/* Row 3: Action outcomes */}
-      <div className="flex gap-2">
-        {actions.map((a) => (
-          <div key={a.label} className={`arch-node border ${a.color} flex-1`}>
-            <div className="font-semibold text-xs">{a.label}</div>
-            <div className="text-2xs mt-0.5 leading-snug opacity-75">{a.desc}</div>
-          </div>
-        ))}
-      </div>
+      <FadeIn delay={0.2} direction="up">
+        <div className="flex gap-2">
+          {actions.map((a) => (
+            <div key={a.label} className={`arch-node border ${a.color} flex-1`}>
+              <div className="font-semibold text-xs">{a.label}</div>
+              <div className="text-2xs mt-0.5 leading-snug opacity-75">{a.desc}</div>
+            </div>
+          ))}
+        </div>
+      </FadeIn>
       <Arrow vertical />
 
       {/* Row 4: Audit Trail */}
-      <div className="flex justify-center">
-        <div className="arch-node border-surface-border text-center px-8 py-2 text-muted bg-surface-subtle">
-          <div className="text-xs font-mono">agent/audit.py</div>
-          <div className="font-semibold text-sm text-navy">Immutable Audit Trail → PostgreSQL</div>
+      <FadeIn delay={0.25} direction="up">
+        <div className="flex justify-center">
+          <div className="arch-node border-surface-border text-center px-8 py-2 text-muted bg-surface-subtle">
+            <div className="text-xs font-mono">agent/audit.py</div>
+            <div className="font-semibold text-sm text-navy">Immutable Audit Trail → PostgreSQL</div>
+          </div>
         </div>
-      </div>
+      </FadeIn>
 
       {/* Support components */}
-      <div className="mt-6 pt-6 border-t border-surface-border">
-        <div className="text-xs font-medium text-muted mb-3 uppercase tracking-wider">Supporting Agents</div>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-          {support.map((c) => <ArchNode key={c.id} comp={c} />)}
+      <FadeIn delay={0.3} direction="up">
+        <div className="mt-6 pt-6 border-t border-surface-border">
+          <div className="text-xs font-medium text-muted mb-3 uppercase tracking-wider">Supporting Agents</div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            {support.map((c) => <ArchNode key={c.id} comp={c} />)}
+          </div>
         </div>
-      </div>
+      </FadeIn>
     </div>
   )
 }

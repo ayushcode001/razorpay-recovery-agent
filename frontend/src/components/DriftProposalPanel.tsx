@@ -1,4 +1,4 @@
-// DriftProposalPanel — policy change proposals with working approve/reject buttons.
+// DriftProposalPanel: policy change proposals with working approve/reject buttons.
 
 import { useState } from 'react'
 import type { PolicyProposal } from '@/hooks/useApi'
@@ -63,7 +63,7 @@ function ProposalCard({ proposal }: { proposal: PolicyProposal }) {
       </div>
 
       {limitError && (
-        <div className="text-xs text-warning mb-3">Rate limited — try again in a moment.</div>
+        <div className="text-xs text-warning mb-3">Rate limited. Try again in a moment.</div>
       )}
 
       {isPending && (

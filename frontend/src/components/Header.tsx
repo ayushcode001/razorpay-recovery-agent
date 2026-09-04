@@ -1,4 +1,4 @@
-// Header — persistent nav used on both / and /dashboard.
+// Header: persistent nav used on both / and /dashboard.
 // Contains: project name, anchor links, "Live Dashboard" CTA, social icons.
 
 import { Link, useLocation } from 'react-router-dom'
@@ -41,7 +41,7 @@ export function Header() {
       <div className="container-page flex items-center justify-between h-14">
         {/* Logo / Name */}
         <Link to="/" className="flex items-center gap-2 text-navy font-semibold text-base hover:text-primary transition-colors">
-          <span className="w-6 h-6 rounded bg-primary flex items-center justify-center text-white text-xs font-bold">R</span>
+          <span className="w-6 h-6 rounded bg-primary flex items-center justify-center text-white text-xs font-bold shadow-xs">R</span>
           Recovery Agent
         </Link>
 
@@ -60,24 +60,42 @@ export function Header() {
 
         {/* Right: Dashboard CTA + Socials */}
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 text-muted">
-            <a href={REPO} target="_blank" rel="noopener noreferrer" className="hover:text-navy transition-colors" aria-label="GitHub Repo">
+          <div className="hidden sm:flex items-center gap-1.5 text-muted">
+            <a
+              href={REPO}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded hover:text-navy hover:bg-surface-muted transition-all duration-150"
+              aria-label="GitHub Repo"
+            >
               <GithubIcon />
             </a>
-            <a href={LINKEDIN} target="_blank" rel="noopener noreferrer" className="hover:text-navy transition-colors" aria-label="LinkedIn">
+            <a
+              href={LINKEDIN}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded hover:text-navy hover:bg-surface-muted transition-all duration-150"
+              aria-label="LinkedIn"
+            >
               <LinkedinIcon />
             </a>
-            <a href={X_URL} target="_blank" rel="noopener noreferrer" className="hover:text-navy transition-colors" aria-label="X / Twitter">
+            <a
+              href={X_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="p-1.5 rounded hover:text-navy hover:bg-surface-muted transition-all duration-150"
+              aria-label="X / Twitter"
+            >
               <XIcon />
             </a>
           </div>
           <div className="w-px h-4 bg-surface-border hidden sm:block" />
           {isDashboard ? (
-            <Link to="/" className="text-sm text-muted hover:text-navy transition-colors">Story</Link>
+            <Link to="/" className="text-sm text-muted hover:text-navy transition-colors font-medium">Story</Link>
           ) : (
             <Link
               to="/dashboard"
-              className="bg-primary text-white text-sm font-medium px-3 py-1.5 rounded-md hover:bg-primary-dark transition-colors"
+              className="bg-primary text-white text-sm font-medium px-3.5 py-1.5 rounded-md hover:bg-primary-dark hover:shadow-sm hover:-translate-y-0.5 transition-all shadow-xs"
             >
               Live Dashboard
             </Link>

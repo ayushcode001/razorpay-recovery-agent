@@ -1,4 +1,4 @@
-// Dashboard page — /dashboard
+// Dashboard page: /dashboard
 // 6 panels: KPIs, Audit Trail, Degradation Alerts, Policy Proposals, Copilot, Checkout Demo
 // TanStack Query for all data. Skeleton loading states. Graceful degradation.
 
@@ -43,7 +43,7 @@ function KPIRow() {
       label: 'Recovery Rate (attempted)',
       value: s.recovery_rate_of_attempted != null
         ? `${(s.recovery_rate_of_attempted * 100).toFixed(1)}%`
-        : '—',
+        : '-',
       color: 'primary' as const,
     },
     {

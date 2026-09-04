@@ -1,4 +1,4 @@
-// LoadingSkeleton — pulsing placeholder that matches content shape.
+// LoadingSkeleton: pulsing placeholder that matches content shape.
 // Shows "Connecting to backend..." context for cold Render starts.
 
 interface SkeletonProps {
@@ -44,7 +44,7 @@ export function BackendConnecting() {
   return (
     <div className="flex items-center gap-2 text-sm text-muted py-2">
       <span className="inline-block w-2 h-2 rounded-full bg-warning animate-pulse" />
-      Connecting to backend — may take a moment on first load
+      Connecting to backend. May take a moment on first load
     </div>
   )
 }

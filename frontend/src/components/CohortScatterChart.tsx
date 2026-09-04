@@ -1,4 +1,4 @@
-// CohortScatterChart — Recharts ScatterChart rendering PCA 2D data from /api/v1/cohort-report.
+// CohortScatterChart: Recharts ScatterChart rendering PCA 2D data from /api/v1/cohort-report.
 // 5 clusters, colored by cohort, tooltip shows archetype + INR recoverable.
 
 import {

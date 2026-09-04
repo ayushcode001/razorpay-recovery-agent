@@ -1,4 +1,4 @@
-// Footer — social links, repo link, one-line credit.
+// Footer: social links, repo link, one-line credit.
 
 const GITHUB_PROFILE = 'https://github.com/ayushcode001'
 const LINKEDIN = 'https://www.linkedin.com/in/aayushmaan-patel-00a062348'
@@ -7,7 +7,7 @@ const REPO = 'https://github.com/ayushcode001/razorpay-recovery-agent'
 
 export function Footer() {
   return (
-    <footer className="border-t border-surface-border bg-surface-muted mt-20">
+    <footer className="border-t border-surface-border bg-surface-muted">
       <div className="container-page py-8 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="text-sm text-muted">
           Built by{' '}

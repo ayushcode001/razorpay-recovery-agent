@@ -1,4 +1,4 @@
-// API client — wraps fetch with Base URL + Basic Auth headers from Vite env vars.
+// API client: wraps fetch with Base URL + Basic Auth headers from Vite env vars.
 // VITE_API_BASE_URL: the Render backend URL (or empty for dev proxy)
 // VITE_API_USERNAME / VITE_API_PASSWORD: Basic Auth credentials
 

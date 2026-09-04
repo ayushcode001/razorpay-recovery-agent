@@ -37,7 +37,7 @@
     @apply py-20;
   }
 
-  /* Stat card — number + label, nothing else */
+  /* Stat card: number + label, nothing else */
   .stat-number {
     @apply font-mono text-3xl font-semibold tracking-tight tabular-nums;
   }
@@ -82,7 +82,7 @@
 
   /* Arch diagram node */
   .arch-node {
-    @apply bg-white border border-surface-border rounded-md p-3 shadow-sm hover:shadow-md transition-shadow duration-200;
+    @apply bg-white border border-surface-border rounded-md p-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200;
   }
 }
 

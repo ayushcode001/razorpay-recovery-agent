@@ -1,4 +1,4 @@
-// BanditConvergenceChart — 4-panel Recharts LineChart from /api/v1/bandit-results.
+// BanditConvergenceChart: 4-panel Recharts LineChart from /api/v1/bandit-results.
 // Shows Thompson Sampling vs 1m baseline vs taxonomy default vs random policy.
 
 import {

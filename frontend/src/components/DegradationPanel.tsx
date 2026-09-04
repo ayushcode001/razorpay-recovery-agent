@@ -1,4 +1,4 @@
-// DegradationPanel — displays active bank/gateway outage alerts.
+// DegradationPanel: displays active bank/gateway outage alerts.
 
 import type { DegradationIncident } from '@/hooks/useApi'
 import { CardSkeleton, BackendConnecting } from '@/components/LoadingSkeleton'
