@@ -50,6 +50,8 @@ export function Header() {
           {isLanding ? (
             <>
               <a href="#problem" className="hover:text-navy transition-colors">Problem</a>
+              <a href="#solution" className="hover:text-navy transition-colors">Solution</a>
+              <a href="#why" className="hover:text-navy transition-colors">Why</a>
               <a href="#how" className="hover:text-navy transition-colors">How</a>
               <a href="#results" className="hover:text-navy transition-colors">Results</a>
             </>

@@ -19,7 +19,7 @@ const colorMap = {
 
 export function StatCard({ label, value, color = 'default', footnote, className = '' }: StatCardProps) {
   return (
-    <div className={`bg-white border border-surface-border rounded-lg p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default ${className}`}>
+    <div className={`card-interactive cursor-default ${className}`}>
       <div className="text-sm text-muted mb-2 font-medium">{label}</div>
       <div className={`stat-number ${colorMap[color]}`}>{value}</div>
       {footnote && (

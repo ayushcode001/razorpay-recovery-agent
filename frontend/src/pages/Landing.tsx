@@ -1,5 +1,5 @@
 // Landing page: /
-// Sections: Hero, Problem, Why, How (Architecture), Results (stats + charts), Footer
+// Sections: Hero, Problem, Solution, Why, How (Architecture), Results (stats + charts), Footer
 // Rule: Real content carries visual weight. No filler text.
 
 import { useState } from 'react'
@@ -36,7 +36,9 @@ export function Landing() {
         className="section-pad border-b border-surface-border relative bg-cover bg-center bg-no-repeat overflow-hidden"
         style={{ backgroundImage: `url(${heroBg})` }}
       >
-        <div className="absolute inset-0 bg-white/70 backdrop-blur-[0.5px] pointer-events-none" />
+        {/* Directional gradient scrim: dense on text side, transparent toward network nodes */}
+        <div className="absolute inset-0 bg-gradient-to-r from-white via-white/85 to-white/35 md:from-white/95 md:via-white/80 md:to-white/20 pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_80%_40%,rgba(37,99,235,0.08),transparent)] pointer-events-none" />
         <div className="container-page max-w-4xl relative z-10">
           <FadeIn delay={0.05} direction="up">
             <div className="mb-6">
@@ -80,8 +82,9 @@ export function Landing() {
       </section>
 
       {/* ── PROBLEM ── */}
-      <section id="problem" className="section-pad border-b border-surface-border">
-        <div className="container-page max-w-4xl">
+      <section id="problem" className="section-pad border-b border-surface-border bg-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none opacity-60" />
+        <div className="container-page max-w-4xl relative z-10">
           <FadeIn direction="up">
             <h2 className="text-2xl font-semibold text-navy mb-4">The Problem</h2>
             <div className="prose text-muted space-y-4 text-base leading-relaxed">
@@ -109,15 +112,88 @@ export function Landing() {
         </div>
       </section>
 
+      {/* ── SOLUTION ── */}
+      <section id="solution" className="section-pad border-b border-surface-border bg-gradient-to-b from-white via-slate-50/60 to-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(37,99,235,0.06),transparent)] pointer-events-none" />
+        <div className="container-page max-w-4xl relative z-10">
+          <FadeIn direction="up">
+            <div className="mb-2">
+              <span className="font-mono text-xs uppercase tracking-wider text-primary font-semibold">The Solution</span>
+            </div>
+            <h2 className="text-2xl md:text-3xl font-bold text-navy tracking-tight mb-4">
+              Autonomous, bounded recovery in a continuous loop
+            </h2>
+            <p className="text-base md:text-lg text-muted leading-relaxed mb-8 max-w-3xl">
+              An intelligent recovery loop that runs across <span className="font-medium text-navy">Detect → Decide → Act → Audit</span>. Instead of indiscriminate retries, the agent evaluates real-time banking telemetry, isolates causal uplift, and executes bounded recovery actions with guaranteed human governance.
+            </p>
+          </FadeIn>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <FadeIn delay={0.05} direction="up">
+              <div className="card-interactive h-full">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-6 h-6 rounded bg-primary-50 border border-primary-light text-primary font-mono font-bold text-xs flex items-center justify-center">1</span>
+                  <div className="text-xs font-mono text-primary font-medium">Detect · Instant Ingestion</div>
+                </div>
+                <h3 className="text-sm font-semibold text-navy mb-1">Webhook Ingestion & Bank Outage Telemetry</h3>
+                <p className="text-xs text-muted leading-relaxed">
+                  Ingests failed payment events under 100ms and cross-references issuer error spikes with a real-time seasonal Z-score monitor. If HDFC or SBI degrades, retries halt immediately.
+                </p>
+              </div>
+            </FadeIn>
+
+            <FadeIn delay={0.1} direction="up">
+              <div className="card-interactive h-full">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-6 h-6 rounded bg-primary-50 border border-primary-light text-primary font-mono font-bold text-xs flex items-center justify-center">2</span>
+                  <div className="text-xs font-mono text-primary font-medium">Decide · Deterministic Gates</div>
+                </div>
+                <h3 className="text-sm font-semibold text-navy mb-1">Taxonomy Safety Layer First</h3>
+                <p className="text-xs text-muted leading-relaxed">
+                  Fraud flags, expired cards, and compliance violations hit hard deterministic stops before ML touches them. Models are never allowed to override regulatory boundaries.
+                </p>
+              </div>
+            </FadeIn>
+
+            <FadeIn delay={0.15} direction="up">
+              <div className="card-interactive h-full">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-6 h-6 rounded bg-primary-50 border border-primary-light text-primary font-mono font-bold text-xs flex items-center justify-center">3</span>
+                  <div className="text-xs font-mono text-primary font-medium">Act · Targeted Causal ML</div>
+                </div>
+                <h3 className="text-sm font-semibold text-navy mb-1">ML Only Where Uncertainty Exists</h3>
+                <p className="text-xs text-muted leading-relaxed">
+                  A T-Learner estimates incremental uplift so retries are only spent when the agent causes the recovery. Thompson Sampling dynamically learns optimal cooldown periods per error category.
+                </p>
+              </div>
+            </FadeIn>
+
+            <FadeIn delay={0.2} direction="up">
+              <div className="card-interactive h-full">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-6 h-6 rounded bg-primary-50 border border-primary-light text-primary font-mono font-bold text-xs flex items-center justify-center">4</span>
+                  <div className="text-xs font-mono text-primary font-medium">Audit · Immutable Governance</div>
+                </div>
+                <h3 className="text-sm font-semibold text-navy mb-1">Human Sign-off on Policy Shifts</h3>
+                <p className="text-xs text-muted leading-relaxed">
+                  Every decision is recorded in an immutable PostgreSQL ledger. Drift-detection agents monitor model decay and propose threshold adjustments that require explicit human approval to activate.
+                </p>
+              </div>
+            </FadeIn>
+          </div>
+        </div>
+      </section>
+
       {/* ── WHY THIS APPROACH ── */}
-      <section id="why" className="section-pad bg-surface-muted border-b border-surface-border">
-        <div className="container-page max-w-4xl">
+      <section id="why" className="section-pad bg-surface-muted border-b border-surface-border relative overflow-hidden">
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#f1f5f9_1px,transparent_1px),linear-gradient(to_bottom,#f1f5f9_1px,transparent_1px)] [background-size:32px_32px] pointer-events-none" />
+        <div className="container-page max-w-4xl relative z-10">
           <FadeIn direction="up">
             <h2 className="text-2xl font-semibold text-navy mb-4">Why This Approach</h2>
           </FadeIn>
           <div className="grid md:grid-cols-2 gap-6">
             <FadeIn delay={0.05} direction="up">
-              <div className="bg-white border border-surface-border rounded-lg p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 h-full">
+              <div className="card-interactive h-full">
                 <div className="text-xs font-mono text-primary mb-2">Causal Uplift, Not Correlation</div>
                 <p className="text-sm text-muted leading-relaxed">
                   A T-Learner separates agent-caused recoveries from organic self-recovery.
@@ -127,7 +203,7 @@ export function Landing() {
               </div>
             </FadeIn>
             <FadeIn delay={0.1} direction="up">
-              <div className="bg-white border border-surface-border rounded-lg p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 h-full">
+              <div className="card-interactive h-full">
                 <div className="text-xs font-mono text-primary mb-2">Drift-Gated Governance</div>
                 <p className="text-sm text-muted leading-relaxed">
                   The drift-check agent evaluates model performance against fresh data and proposes
@@ -137,7 +213,7 @@ export function Landing() {
               </div>
             </FadeIn>
             <FadeIn delay={0.15} direction="up">
-              <div className="bg-white border border-surface-border rounded-lg p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 h-full">
+              <div className="card-interactive h-full">
                 <div className="text-xs font-mono text-primary mb-2">Deterministic Safety Gates</div>
                 <p className="text-sm text-muted leading-relaxed">
                   Risk, compliance, and fraud-flagged transactions are routed through a deterministic
@@ -147,7 +223,7 @@ export function Landing() {
               </div>
             </FadeIn>
             <FadeIn delay={0.2} direction="up">
-              <div className="bg-white border border-surface-border rounded-lg p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 h-full">
+              <div className="card-interactive h-full">
                 <div className="text-xs font-mono text-primary mb-2">Full Audit Trail</div>
                 <p className="text-sm text-muted leading-relaxed">
                   Every decision (attempted, skipped, escalated) is logged with the predicted
@@ -161,8 +237,9 @@ export function Landing() {
       </section>
 
       {/* ── HOW IT WORKS (Architecture) ── */}
-      <section id="how" className="section-pad border-b border-surface-border">
-        <div className="container-page">
+      <section id="how" className="section-pad border-b border-surface-border bg-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none opacity-60" />
+        <div className="container-page relative z-10">
           <FadeIn direction="up">
             <div className="mb-8">
               <h2 className="text-2xl font-semibold text-navy">How It Works</h2>
@@ -173,8 +250,10 @@ export function Landing() {
       </section>
 
       {/* ── RESULTS ── */}
-      <section id="results" className="section-pad bg-surface-muted border-b border-surface-border">
-        <div className="container-page">
+      <section id="results" className="section-pad bg-surface-muted border-b border-surface-border relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-white via-surface-muted to-white pointer-events-none" />
+        <div className="absolute top-0 right-1/4 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="container-page relative z-10">
           <FadeIn direction="up">
             <h2 className="text-2xl font-semibold text-navy mb-8">Results</h2>
           </FadeIn>
@@ -190,7 +269,7 @@ export function Landing() {
 
           {/* Stage breakdown */}
           <FadeIn delay={0.15} direction="up">
-            <div className="bg-white border border-surface-border rounded-lg p-5 shadow-sm mb-10">
+            <div className="card-interactive mb-10">
               <h3 className="text-base font-semibold text-navy mb-4">Two-Stage Performance</h3>
               <div className="grid md:grid-cols-2 gap-6 text-sm">
                 <div>
@@ -217,7 +296,7 @@ export function Landing() {
           <div className="space-y-8">
             {/* Cohort Scatter */}
             <FadeIn delay={0.1} direction="up">
-              <div className="bg-white border border-surface-border rounded-lg p-5 shadow-sm">
+              <div className="card-interactive">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
                   <div>
                     <h3 className="text-base font-semibold text-navy mb-0.5">Discovered Transaction Cohorts</h3>
@@ -279,7 +358,7 @@ export function Landing() {
 
             {/* Bandit Convergence */}
             <FadeIn delay={0.15} direction="up">
-              <div className="bg-white border border-surface-border rounded-lg p-5 shadow-sm">
+              <div className="card-interactive">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
                   <div>
                     <h3 className="text-base font-semibold text-navy mb-0.5">Contextual Retry Bandit Convergence</h3>

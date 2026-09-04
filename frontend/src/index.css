@@ -80,9 +80,58 @@
     @apply bg-warning-light text-warning-text;
   }
 
+  /* Interactive card with lift, soft glow, and shimmer sheen sweep */
+  .card-interactive {
+    @apply relative overflow-hidden bg-white border border-surface-border rounded-lg p-5 shadow-sm transition-all duration-300;
+  }
+
+  .card-interactive:hover {
+    @apply border-primary/40 -translate-y-1 shadow-lg shadow-primary/5 ring-1 ring-primary/20;
+  }
+
+  .card-interactive::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -150%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      115deg,
+      transparent 0%,
+      transparent 40%,
+      rgba(255, 255, 255, 0.6) 50%,
+      transparent 60%,
+      transparent 100%
+    );
+    pointer-events: none;
+    transition: left 0.75s ease;
+  }
+
+  .card-interactive:hover::after {
+    left: 150%;
+  }
+
   /* Arch diagram node */
   .arch-node {
-    @apply bg-white border border-surface-border rounded-md p-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200;
+    @apply relative overflow-hidden bg-white border border-surface-border rounded-md p-3 shadow-sm transition-all duration-300;
+  }
+
+  .arch-node:hover {
+    @apply -translate-y-1 shadow-md shadow-primary/5 ring-1 ring-primary/25 border-primary/40;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card-interactive,
+    .card-interactive:hover,
+    .arch-node,
+    .arch-node:hover {
+      transform: none !important;
+      transition: border-color 0.2s, box-shadow 0.2s !important;
+    }
+    .card-interactive::after {
+      display: none !important;
+    }
   }
 }
 

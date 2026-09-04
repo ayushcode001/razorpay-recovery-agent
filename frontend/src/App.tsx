@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Header } from '@/components/Header'
+import { FloatingCopilot } from '@/components/FloatingCopilot'
 import { Landing } from '@/pages/Landing'
 import { Dashboard } from '@/pages/Dashboard'
 
@@ -44,6 +45,7 @@ export default function App() {
         <main>
           <AnimatedRoutes />
         </main>
+        <FloatingCopilot />
       </BrowserRouter>
     </QueryClientProvider>
   )

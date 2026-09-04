@@ -7,7 +7,6 @@ import { StatCardSkeleton } from '@/components/LoadingSkeleton'
 import { AuditTrailTable } from '@/components/AuditTrailTable'
 import { DegradationPanel } from '@/components/DegradationPanel'
 import { DriftProposalPanel } from '@/components/DriftProposalPanel'
-import { CopilotChat } from '@/components/CopilotChat'
 import { CheckoutTrigger } from '@/components/CheckoutTrigger'
 import { useAuditTrail, useDegradationAlerts, usePolicyProposals } from '@/hooks/useApi'
 
@@ -127,10 +126,44 @@ export function Dashboard() {
           />
         </div>
 
-        {/* ── COPILOT + CHECKOUT ── */}
+        {/* ── CHECKOUT DEMO & TESTING GUIDE ── */}
         <div className="grid md:grid-cols-2 gap-6">
-          <CopilotChat />
           <CheckoutTrigger />
+          <div className="card-interactive flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b border-surface-border pb-3 mb-4">
+                <h2 className="text-base font-semibold text-navy">Autonomous Pipeline Guide</h2>
+                <span className="text-2xs font-mono font-medium text-primary bg-primary-50 px-2 py-0.5 rounded border border-primary-light">
+                  Live System
+                </span>
+              </div>
+              <div className="space-y-3 text-xs text-muted leading-relaxed">
+                <div className="flex gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-mono font-bold text-2xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+                  <div>
+                    <strong className="text-navy">Simulate a failure</strong> using the test cards on the left. The Razorpay checkout modal generates a mock transaction failure.
+                  </div>
+                </div>
+                <div className="flex gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-mono font-bold text-2xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+                  <div>
+                    <strong className="text-navy">Autonomous decisioning</strong> intercepts the webhook: checks bank degradation, evaluates the deterministic taxonomy safety gate, and computes causal uplift.
+                  </div>
+                </div>
+                <div className="flex gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-primary/10 text-primary font-mono font-bold text-2xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+                  <div>
+                    <strong className="text-navy">Live Audit Trail</strong> records the chosen recovery action (retry, nudge, or human escalation) into PostgreSQL within 10 seconds.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 pt-3 border-t border-surface-border text-2xs text-muted flex items-center justify-between">
+              <span>Have questions about the results?</span>
+              <span className="text-primary font-medium">Use Copilot in the bottom-right →</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
