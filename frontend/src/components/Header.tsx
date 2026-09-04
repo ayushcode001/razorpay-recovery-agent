@@ -37,23 +37,44 @@ export function Header() {
   const isDashboard = location.pathname.startsWith('/dashboard')
 
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-surface-border">
+    <header
+      className={`sticky top-0 z-50 backdrop-blur-md transition-colors duration-300 border-b ${
+        isLanding
+          ? 'bg-[#0C0C0E]/85 border-white/[0.08] text-dark-cream'
+          : 'bg-white/95 border-surface-border text-navy'
+      }`}
+    >
       <div className="container-page flex items-center justify-between h-14">
         {/* Logo / Name */}
-        <Link to="/" className="flex items-center gap-2 text-navy font-semibold text-base hover:text-primary transition-colors">
-          <span className="w-6 h-6 rounded bg-primary flex items-center justify-center text-white text-xs font-bold shadow-xs">R</span>
-          Recovery Agent
+        <Link
+          to="/"
+          className={`flex items-center gap-2 font-semibold text-base transition-colors ${
+            isLanding ? 'text-dark-cream hover:text-amber' : 'text-navy hover:text-primary'
+          }`}
+        >
+          <span
+            className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold shadow-xs ${
+              isLanding ? 'bg-amber text-black' : 'bg-primary text-white'
+            }`}
+          >
+            R
+          </span>
+          <span>Recovery Agent</span>
         </Link>
 
         {/* Nav links */}
-        <nav className="hidden md:flex items-center gap-6 text-sm text-muted">
+        <nav
+          className={`hidden md:flex items-center gap-6 text-sm ${
+            isLanding ? 'text-dark-muted' : 'text-muted'
+          }`}
+        >
           {isLanding ? (
             <>
-              <a href="#problem" className="hover:text-navy transition-colors">Problem</a>
-              <a href="#solution" className="hover:text-navy transition-colors">Solution</a>
-              <a href="#why" className="hover:text-navy transition-colors">Why</a>
-              <a href="#how" className="hover:text-navy transition-colors">How</a>
-              <a href="#results" className="hover:text-navy transition-colors">Results</a>
+              <a href="#problem" className="hover:text-dark-cream transition-colors">Problem</a>
+              <a href="#solution" className="hover:text-dark-cream transition-colors">Solution</a>
+              <a href="#why" className="hover:text-dark-cream transition-colors">Why</a>
+              <a href="#how" className="hover:text-dark-cream transition-colors">How</a>
+              <a href="#results" className="hover:text-dark-cream transition-colors">Results</a>
             </>
           ) : (
             <Link to="/" className="hover:text-navy transition-colors">← Landing</Link>
@@ -62,12 +83,20 @@ export function Header() {
 
         {/* Right: Dashboard CTA + Socials */}
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-1.5 text-muted">
+          <div
+            className={`hidden sm:flex items-center gap-1.5 ${
+              isLanding ? 'text-dark-muted' : 'text-muted'
+            }`}
+          >
             <a
               href={REPO}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded hover:text-navy hover:bg-surface-muted transition-all duration-150"
+              className={`p-1.5 rounded transition-all duration-150 ${
+                isLanding
+                  ? 'hover:text-dark-cream hover:bg-white/[0.06]'
+                  : 'hover:text-navy hover:bg-surface-muted'
+              }`}
               aria-label="GitHub Repo"
             >
               <GithubIcon />
@@ -76,7 +105,11 @@ export function Header() {
               href={LINKEDIN}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded hover:text-navy hover:bg-surface-muted transition-all duration-150"
+              className={`p-1.5 rounded transition-all duration-150 ${
+                isLanding
+                  ? 'hover:text-dark-cream hover:bg-white/[0.06]'
+                  : 'hover:text-navy hover:bg-surface-muted'
+              }`}
               aria-label="LinkedIn"
             >
               <LinkedinIcon />
@@ -85,19 +118,32 @@ export function Header() {
               href={X_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded hover:text-navy hover:bg-surface-muted transition-all duration-150"
+              className={`p-1.5 rounded transition-all duration-150 ${
+                isLanding
+                  ? 'hover:text-dark-cream hover:bg-white/[0.06]'
+                  : 'hover:text-navy hover:bg-surface-muted'
+              }`}
               aria-label="X / Twitter"
             >
               <XIcon />
             </a>
           </div>
-          <div className="w-px h-4 bg-surface-border hidden sm:block" />
+          <div
+            className={`w-px h-4 hidden sm:block ${
+              isLanding ? 'bg-white/[0.08]' : 'bg-surface-border'
+            }`}
+          />
           {isDashboard ? (
-            <Link to="/" className="text-sm text-muted hover:text-navy transition-colors font-medium">Story</Link>
+            <Link
+              to="/"
+              className="text-sm text-muted hover:text-navy transition-colors font-medium"
+            >
+              Story
+            </Link>
           ) : (
             <Link
               to="/dashboard"
-              className="bg-primary text-white text-sm font-medium px-3.5 py-1.5 rounded-md hover:bg-primary-dark hover:shadow-sm hover:-translate-y-0.5 transition-all shadow-xs"
+              className="bg-dark-cream text-black hover:bg-white text-sm font-semibold px-3.5 py-1.5 rounded-md hover:shadow-md hover:shadow-amber/10 hover:-translate-y-0.5 transition-all shadow-xs"
             >
               Live Dashboard
             </Link>

@@ -14,9 +14,6 @@
     --color-muted: #64748B;
   }
 
-  html {
-    scroll-behavior: smooth;
-  }
 
   body {
     @apply font-sans text-navy bg-white antialiased;
@@ -112,6 +109,39 @@
     left: 150%;
   }
 
+  /* Dark theme interactive card (Buildathon editorial style) */
+  .card-dark {
+    @apply relative overflow-hidden bg-white/[0.03] border border-white/[0.08] rounded-lg p-5 transition-all duration-300;
+    backdrop-filter: blur(8px);
+  }
+
+  .card-dark:hover {
+    @apply border-amber/40 -translate-y-1 shadow-lg shadow-amber/5 ring-1 ring-amber/20;
+  }
+
+  .card-dark::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -150%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      115deg,
+      transparent 0%,
+      transparent 40%,
+      rgba(201, 150, 42, 0.15) 50%,
+      transparent 60%,
+      transparent 100%
+    );
+    pointer-events: none;
+    transition: left 0.85s ease;
+  }
+
+  .card-dark:hover::after {
+    left: 150%;
+  }
+
   /* Arch diagram node */
   .arch-node {
     @apply relative overflow-hidden bg-white border border-surface-border rounded-md p-3 shadow-sm transition-all duration-300;
@@ -121,15 +151,30 @@
     @apply -translate-y-1 shadow-md shadow-primary/5 ring-1 ring-primary/25 border-primary/40;
   }
 
+  /* Arch diagram node - dark theme */
+  .arch-node-dark {
+    @apply relative overflow-hidden bg-white/[0.025] border border-white/[0.08] rounded-md p-3 transition-all duration-300;
+    backdrop-filter: blur(6px);
+  }
+
+  .arch-node-dark:hover {
+    @apply -translate-y-0.5 shadow-md shadow-amber/10 ring-1 ring-amber/30 border-amber/50;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .card-interactive,
     .card-interactive:hover,
+    .card-dark,
+    .card-dark:hover,
     .arch-node,
-    .arch-node:hover {
+    .arch-node:hover,
+    .arch-node-dark,
+    .arch-node-dark:hover {
       transform: none !important;
       transition: border-color 0.2s, box-shadow 0.2s !important;
     }
-    .card-interactive::after {
+    .card-interactive::after,
+    .card-dark::after {
       display: none !important;
     }
   }
