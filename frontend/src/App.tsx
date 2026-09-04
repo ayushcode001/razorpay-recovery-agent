@@ -3,48 +3,13 @@ import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ReactLenis, useLenis } from 'lenis/react'
-import gsap from 'gsap'
-import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import { Header } from '@/components/Header'
 import { FloatingCopilot } from '@/components/FloatingCopilot'
 import { Landing } from '@/pages/Landing'
 import { Dashboard } from '@/pages/Dashboard'
 
-gsap.registerPlugin(ScrollTrigger)
-
 /**
- * Synchronizes Lenis smooth scrolling with GSAP ticker & ScrollTrigger.
- * Driving Lenis via gsap.ticker ensures both libraries share the exact same
- * frame loop, eliminating jitter and lag.
- */
-function ScrollTriggerSync() {
-  const lenis = useLenis()
-
-  useEffect(() => {
-    if (!lenis) return
-
-    const update = (time: number) => {
-      lenis.raf(time * 1000)
-    }
-
-    gsap.ticker.add(update)
-    gsap.ticker.lagSmoothing(0)
-
-    const unsubscribe = lenis.on('scroll', () => {
-      ScrollTrigger.update()
-    })
-
-    return () => {
-      gsap.ticker.remove(update)
-      unsubscribe()
-    }
-  }, [lenis])
-
-  return null
-}
-
-/**
- * Handles route transitions: resets scroll position to top and refreshes ScrollTrigger.
+ * Handles route transitions: immediately resets scroll position to top.
  */
 function RouteScrollManager() {
   const { pathname } = useLocation()
@@ -56,12 +21,6 @@ function RouteScrollManager() {
     } else {
       window.scrollTo(0, 0)
     }
-
-    const timer = setTimeout(() => {
-      ScrollTrigger.refresh()
-    }, 150)
-
-    return () => clearTimeout(timer)
   }, [pathname, lenis])
 
   return null
@@ -88,14 +47,16 @@ function SmoothScrollProvider({ children }: { children: ReactNode }) {
   return (
     <ReactLenis
       root
-      autoRaf={false}
       options={{
-        lerp: 0.09,
-        duration: 1.2,
+        duration: 1.4,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        orientation: 'vertical',
+        gestureOrientation: 'vertical',
         smoothWheel: true,
+        wheelMultiplier: 1.0,
+        touchMultiplier: 1.5,
       }}
     >
-      <ScrollTriggerSync />
       {children}
     </ReactLenis>
   )

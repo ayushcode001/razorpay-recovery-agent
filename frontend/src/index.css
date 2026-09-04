@@ -16,7 +16,7 @@
 
 
   body {
-    @apply font-sans text-navy bg-white antialiased;
+    @apply font-sans text-dark-cream bg-[#0C0C0E] antialiased;
     font-feature-settings: 'cv11', 'ss01';
   }
 
@@ -57,7 +57,7 @@
 
   /* Skeleton loading pulse */
   .skeleton {
-    @apply bg-surface-subtle rounded animate-pulse;
+    @apply bg-white/[0.05] rounded animate-pulse;
   }
 
   /* Action pill badges */
@@ -65,16 +65,16 @@
     @apply inline-flex items-center px-2 py-0.5 rounded text-2xs font-semibold tracking-wide uppercase;
   }
   .pill-retry {
-    @apply bg-primary-light text-primary-dark;
+    @apply bg-blue-500/15 text-blue-300 border border-blue-500/30;
   }
   .pill-prompt {
-    @apply bg-success-light text-success-text;
+    @apply bg-emerald-500/15 text-emerald-300 border border-emerald-500/30;
   }
   .pill-escalate {
-    @apply bg-danger-light text-danger-text;
+    @apply bg-rose-500/15 text-rose-300 border border-rose-500/30;
   }
   .pill-skip {
-    @apply bg-warning-light text-warning-text;
+    @apply bg-amber-500/15 text-amber-300 border border-amber-500/30;
   }
 
   /* Interactive card with lift, soft glow, and shimmer sheen sweep */

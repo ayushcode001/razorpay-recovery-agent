@@ -1,7 +1,6 @@
 // Architecture diagram: 8-component flow layout.
 // CSS-positioned boxes with connector lines. Not ASCII, not an image.
 // Adapts the ASCII diagram from README into a styled visual flow.
-// Annotated with data-arch attributes for GSAP ScrollTrigger pin-and-reveal.
 
 const COMPONENTS = [
   {
