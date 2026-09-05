@@ -66,7 +66,7 @@ export function CheckoutTrigger() {
           email: 'test@example.com',
           contact: '9000000000',
         },
-        theme: { color: '#C9962A' },
+        theme: { color: '#2563EB' },
         handler: () => {
           // Rare: payment success in test mode
           setError('Payment succeeded (unexpected in demo). Try a failure card.')
@@ -87,21 +87,21 @@ export function CheckoutTrigger() {
   }
 
   return (
-    <div className="card-dark rounded-lg shadow-sm overflow-hidden border border-white/[0.08]">
-      <div className="px-5 py-4 border-b border-white/[0.08]">
-        <h2 className="text-base font-semibold text-dark-cream">Checkout Demo</h2>
-        <div className="text-xs text-dark-muted mt-0.5">Test mode · Use Razorpay failure card numbers</div>
+    <div className="bg-white border border-surface-border rounded-lg shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-surface-border">
+        <h2 className="text-base font-semibold text-navy">Checkout Demo</h2>
+        <div className="text-xs text-muted mt-0.5">Test mode · Use Razorpay failure card numbers</div>
       </div>
       <div className="p-5 space-y-4">
-        <div className="text-sm text-dark-muted space-y-1 bg-white/[0.025] rounded-md p-3 font-mono text-xs border border-white/[0.08]">
-          <div className="font-semibold text-dark-cream text-base font-sans mb-2">Failure test cards</div>
-          <div><span className="text-dark-muted">Insufficient Funds:</span> <span className="text-dark-cream">4111 1111 1111 1111</span></div>
-          <div><span className="text-dark-muted">Technical Error:</span>    <span className="text-dark-cream">5267 3181 8797 5449</span></div>
-          <div><span className="text-dark-muted">CVV:</span> any 3 digits &nbsp; Expiry: any future date</div>
+        <div className="text-sm text-muted space-y-1 bg-surface-subtle rounded-none p-3 font-mono text-xs border border-surface-border">
+          <div className="font-semibold text-navy text-base font-sans mb-2">Failure test cards</div>
+          <div><span className="text-muted-light">Insufficient Funds:</span> <span className="text-navy font-semibold">4111 1111 1111 1111</span></div>
+          <div><span className="text-muted-light">Technical Error:</span>    <span className="text-navy font-semibold">5267 3181 8797 5449</span></div>
+          <div><span className="text-muted-light">CVV:</span> any 3 digits &nbsp; Expiry: any future date</div>
         </div>
 
         <div className="flex items-center gap-3">
-          <label className="text-sm text-dark-muted whitespace-nowrap">Amount (paise):</label>
+          <label className="text-sm text-muted whitespace-nowrap">Amount (paise):</label>
           <input
             id="checkout-amount"
             type="number"
@@ -109,23 +109,23 @@ export function CheckoutTrigger() {
             onChange={(e) => setAmount(Math.max(100, Number(e.target.value)))}
             min={100}
             step={100}
-            className="w-28 text-sm bg-white/[0.04] text-dark-cream border border-white/[0.1] rounded px-2.5 py-1.5 font-mono focus:outline-none focus:ring-1 focus:ring-amber/40 focus:border-amber"
+            className="w-28 text-sm bg-white text-navy border border-surface-border rounded-none px-2.5 py-1.5 font-mono focus:outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary"
           />
-          <span className="text-sm text-dark-muted">= ₹{(amount / 100).toFixed(2)}</span>
+          <span className="text-sm text-muted">= ₹{(amount / 100).toFixed(2)}</span>
         </div>
 
-        {error && <div className="text-sm text-rose-400">{error}</div>}
+        {error && <div className="text-sm text-danger">{error}</div>}
 
         <button
           id="checkout-trigger-btn"
           onClick={triggerCheckout}
           disabled={loading}
-          className="w-full bg-amber hover:bg-amber-light text-dark-bg text-sm font-semibold py-2.5 rounded-md disabled:opacity-60 transition-colors shadow-sm shadow-amber/10"
+          className="w-full bg-primary hover:bg-primary-dark text-white text-sm font-semibold py-2.5 rounded-none disabled:opacity-60 transition-colors shadow-xs"
         >
           {loading ? 'Opening Razorpay…' : 'Trigger Test Payment'}
         </button>
 
-        <div className="text-xs text-dark-muted">
+        <div className="text-xs text-muted">
           After payment failure → return to dashboard → audit trail updates within 10s (polling).
         </div>
       </div>

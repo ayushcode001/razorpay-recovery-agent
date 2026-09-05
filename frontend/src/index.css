@@ -16,7 +16,7 @@
 
 
   body {
-    @apply font-sans text-dark-cream bg-[#0C0C0E] antialiased;
+    @apply font-sans text-navy bg-white antialiased;
     font-feature-settings: 'cv11', 'ss01';
   }
 
@@ -57,24 +57,24 @@
 
   /* Skeleton loading pulse */
   .skeleton {
-    @apply bg-white/[0.05] rounded animate-pulse;
+    @apply bg-surface-subtle rounded animate-pulse;
   }
 
-  /* Action pill badges */
+  /* Action pill badges - light mode */
   .pill {
     @apply inline-flex items-center px-2 py-0.5 rounded text-2xs font-semibold tracking-wide uppercase;
   }
   .pill-retry {
-    @apply bg-blue-500/15 text-blue-300 border border-blue-500/30;
+    @apply bg-primary-light text-primary-dark border border-primary/20;
   }
   .pill-prompt {
-    @apply bg-emerald-500/15 text-emerald-300 border border-emerald-500/30;
+    @apply bg-success-light text-success-text border border-success/20;
   }
   .pill-escalate {
-    @apply bg-rose-500/15 text-rose-300 border border-rose-500/30;
+    @apply bg-danger-light text-danger-text border border-danger/20;
   }
   .pill-skip {
-    @apply bg-amber-500/15 text-amber-300 border border-amber-500/30;
+    @apply bg-warning-light text-warning-text border border-warning/20;
   }
 
   /* Interactive card with lift, soft glow, and shimmer sheen sweep */
@@ -83,7 +83,7 @@
   }
 
   .card-interactive:hover {
-    @apply border-primary/40 -translate-y-1 shadow-lg shadow-primary/5 ring-1 ring-primary/20;
+    @apply border-primary/40 -translate-y-0.5 shadow-md shadow-primary/5 ring-1 ring-primary/20;
   }
 
   .card-interactive::after {
@@ -97,7 +97,7 @@
       115deg,
       transparent 0%,
       transparent 40%,
-      rgba(255, 255, 255, 0.6) 50%,
+      rgba(37, 99, 235, 0.08) 50%,
       transparent 60%,
       transparent 100%
     );
@@ -109,56 +109,31 @@
     left: 150%;
   }
 
-  /* Dark theme interactive card (Buildathon editorial style) */
+  /* Card dark alias mapped cleanly to light card-interactive */
   .card-dark {
-    @apply relative overflow-hidden bg-white/[0.03] border border-white/[0.08] rounded-lg p-5 transition-all duration-300;
-    backdrop-filter: blur(8px);
+    @apply relative overflow-hidden bg-white border border-surface-border rounded-lg p-5 shadow-sm transition-all duration-300;
   }
 
   .card-dark:hover {
-    @apply border-amber/40 -translate-y-1 shadow-lg shadow-amber/5 ring-1 ring-amber/20;
-  }
-
-  .card-dark::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -150%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-      115deg,
-      transparent 0%,
-      transparent 40%,
-      rgba(201, 150, 42, 0.15) 50%,
-      transparent 60%,
-      transparent 100%
-    );
-    pointer-events: none;
-    transition: left 0.85s ease;
-  }
-
-  .card-dark:hover::after {
-    left: 150%;
+    @apply border-primary/40 -translate-y-0.5 shadow-md shadow-primary/5 ring-1 ring-primary/20;
   }
 
   /* Arch diagram node */
   .arch-node {
-    @apply relative overflow-hidden bg-white border border-surface-border rounded-md p-3 shadow-sm transition-all duration-300;
+    @apply relative overflow-hidden bg-white border border-surface-border rounded-md p-3 shadow-sm transition-all duration-200;
   }
 
   .arch-node:hover {
-    @apply -translate-y-1 shadow-md shadow-primary/5 ring-1 ring-primary/25 border-primary/40;
+    @apply -translate-y-0.5 shadow-md shadow-primary/5 ring-1 ring-primary/25 border-primary/40;
   }
 
-  /* Arch diagram node - dark theme */
+  /* Arch diagram node - mapped to light theme */
   .arch-node-dark {
-    @apply relative overflow-hidden bg-white/[0.025] border border-white/[0.08] rounded-md p-3 transition-all duration-300;
-    backdrop-filter: blur(6px);
+    @apply relative overflow-hidden bg-white border border-surface-border rounded-md p-3 shadow-sm transition-all duration-200;
   }
 
   .arch-node-dark:hover {
-    @apply -translate-y-0.5 shadow-md shadow-amber/10 ring-1 ring-amber/30 border-amber/50;
+    @apply -translate-y-0.5 shadow-md shadow-primary/5 ring-1 ring-primary/25 border-primary/40;
   }
 
   @media (prefers-reduced-motion: reduce) {

@@ -32,7 +32,7 @@ export function StatCard({
   color = 'default',
   footnote,
   className = '',
-  dark = true,
+  dark = false,
 }: StatCardProps) {
   const colorMap = dark ? colorMapDark : colorMapLight
 

@@ -134,7 +134,7 @@ export function FloatingCopilot() {
                 {Boolean(lastContext) && (
                   <button
                     onClick={() => setShowContext(v => !v)}
-                    className="text-3xs font-mono text-muted-lighter hover:text-white transition-colors border border-white/15 px-1.5 py-1 rounded"
+                    className="text-3xs font-mono text-muted-lighter hover:text-white transition-colors border border-white/15 px-1.5 py-1 rounded-none"
                     title="Inspect grounding payload"
                   >
                     {showContext ? 'Hide' : 'Context'}
@@ -142,7 +142,7 @@ export function FloatingCopilot() {
                 )}
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center text-muted-lighter hover:text-white transition-colors text-sm"
+                  className="w-7 h-7 rounded-none hover:bg-white/10 flex items-center justify-center text-muted-lighter hover:text-white transition-colors text-sm"
                   aria-label="Close copilot"
                 >
                   ✕
@@ -157,7 +157,7 @@ export function FloatingCopilot() {
                   <button
                     key={p}
                     onClick={() => sendMessage(p)}
-                    className="text-2xs text-left text-primary hover:text-primary-dark bg-white border border-primary-light/40 hover:border-primary px-2.5 py-1.5 rounded-md transition-all shadow-xs"
+                    className="text-2xs text-left text-primary hover:text-primary-dark bg-white border border-primary-light/40 hover:border-primary px-2.5 py-1.5 rounded-none transition-all shadow-xs"
                   >
                     {p}
                   </button>
@@ -229,13 +229,13 @@ export function FloatingCopilot() {
                 placeholder="Ask about payment recoveries…"
                 maxLength={500}
                 disabled={copilot.isPending}
-                className="flex-1 text-xs border border-surface-border rounded-lg px-3 py-2 outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary transition-colors placeholder:text-muted-light disabled:opacity-50"
+                className="flex-1 text-xs border border-surface-border rounded-none px-3 py-2 outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary transition-colors placeholder:text-muted-light disabled:opacity-50"
               />
               <button
                 id="floating-copilot-send"
                 onClick={() => sendMessage(input)}
                 disabled={copilot.isPending || !input.trim()}
-                className="bg-primary text-white text-xs font-semibold px-3.5 py-2 rounded-lg hover:bg-primary-dark disabled:opacity-50 transition-colors shadow-xs shrink-0"
+                className="bg-primary text-white text-xs font-semibold px-3.5 py-2 rounded-none hover:bg-primary-dark disabled:opacity-50 transition-colors shadow-xs shrink-0"
               >
                 Send
               </button>
@@ -251,7 +251,7 @@ export function FloatingCopilot() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         aria-label={isOpen ? "Close copilot chat" : "Open copilot chat"}
-        className={`w-13 h-13 sm:w-14 sm:h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-300 relative ${
+        className={`w-13 h-13 sm:w-14 sm:h-14 rounded-none shadow-xl flex items-center justify-center transition-all duration-300 relative ${
           isOpen
             ? 'bg-navy text-white ring-2 ring-navy-light/40'
             : 'bg-primary text-white hover:bg-primary-hover shadow-primary/25 ring-2 ring-primary/20'

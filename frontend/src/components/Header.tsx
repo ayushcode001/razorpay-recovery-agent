@@ -37,31 +37,31 @@ export function Header() {
   const isDashboard = location.pathname.startsWith('/dashboard')
 
   return (
-    <header className="sticky top-0 z-50 backdrop-blur-md bg-[#0C0C0E]/85 border-b border-white/[0.08] text-dark-cream">
+    <header className="sticky top-0 z-50 backdrop-blur-md bg-white/90 border-b border-surface-border text-navy">
       <div className="container-page flex items-center justify-between h-14">
         {/* Logo / Name */}
         <Link
           to="/"
-          className="flex items-center gap-2 font-semibold text-base text-dark-cream hover:text-amber transition-colors"
+          className="flex items-center gap-2 font-semibold text-base text-navy hover:text-primary transition-colors"
         >
-          <span className="w-6 h-6 rounded flex items-center justify-center text-xs font-bold bg-amber text-black shadow-xs">
+          <span className="w-6 h-6 rounded-none flex items-center justify-center text-xs font-bold bg-primary text-white shadow-xs">
             R
           </span>
           <span>Recovery Agent</span>
         </Link>
 
         {/* Nav links */}
-        <nav className="hidden md:flex items-center gap-6 text-sm text-dark-muted">
+        <nav className="hidden md:flex items-center gap-6 text-sm text-muted">
           {isLanding ? (
             <>
-              <a href="#problem" className="hover:text-dark-cream transition-colors">Problem</a>
-              <a href="#solution" className="hover:text-dark-cream transition-colors">Solution</a>
-              <a href="#why" className="hover:text-dark-cream transition-colors">Why</a>
-              <a href="#how" className="hover:text-dark-cream transition-colors">How</a>
-              <a href="#results" className="hover:text-dark-cream transition-colors">Results</a>
+              <a href="#problem" className="hover:text-navy transition-colors">Problem</a>
+              <a href="#solution" className="hover:text-navy transition-colors">Solution</a>
+              <a href="#why" className="hover:text-navy transition-colors">Why</a>
+              <a href="#how" className="hover:text-navy transition-colors">How</a>
+              <a href="#results" className="hover:text-navy transition-colors">Results</a>
             </>
           ) : (
-            <Link to="/" className="hover:text-dark-cream transition-colors flex items-center gap-1">
+            <Link to="/" className="hover:text-navy transition-colors flex items-center gap-1">
               <span>←</span>
               <span>Back to Overview</span>
             </Link>
@@ -70,12 +70,12 @@ export function Header() {
 
         {/* Right: Dashboard CTA + Socials */}
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-1.5 text-dark-muted">
+          <div className="hidden sm:flex items-center gap-1.5 text-muted">
             <a
               href={REPO}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded text-dark-muted hover:text-dark-cream hover:bg-white/[0.06] transition-all duration-150"
+              className="p-1.5 rounded-none text-muted hover:text-navy hover:bg-surface-muted transition-all duration-150"
               aria-label="GitHub Repo"
             >
               <GithubIcon />
@@ -84,7 +84,7 @@ export function Header() {
               href={LINKEDIN}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded text-dark-muted hover:text-dark-cream hover:bg-white/[0.06] transition-all duration-150"
+              className="p-1.5 rounded-none text-muted hover:text-navy hover:bg-surface-muted transition-all duration-150"
               aria-label="LinkedIn"
             >
               <LinkedinIcon />
@@ -93,24 +93,24 @@ export function Header() {
               href={X_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="p-1.5 rounded text-dark-muted hover:text-dark-cream hover:bg-white/[0.06] transition-all duration-150"
+              className="p-1.5 rounded-none text-muted hover:text-navy hover:bg-surface-muted transition-all duration-150"
               aria-label="X / Twitter"
             >
               <XIcon />
             </a>
           </div>
-          <div className="w-px h-4 hidden sm:block bg-white/[0.08]" />
+          <div className="w-px h-4 hidden sm:block bg-surface-border" />
           {isDashboard ? (
             <Link
               to="/"
-              className="border border-white/15 bg-white/[0.04] text-dark-cream hover:bg-white/[0.08] hover:border-white/25 text-sm font-medium px-3.5 py-1.5 rounded-md transition-all"
+              className="border border-surface-border bg-surface-subtle text-navy hover:bg-surface-muted text-sm font-medium px-3.5 py-1.5 rounded-none transition-all"
             >
               Overview
             </Link>
           ) : (
             <Link
               to="/dashboard"
-              className="bg-dark-cream text-black hover:bg-white text-sm font-semibold px-3.5 py-1.5 rounded-md hover:shadow-md hover:shadow-amber/10 hover:-translate-y-0.5 transition-all shadow-xs"
+              className="bg-primary text-white hover:bg-primary-dark text-sm font-semibold px-3.5 py-1.5 rounded-none hover:shadow-md transition-all shadow-xs"
             >
               Live Dashboard
             </Link>
