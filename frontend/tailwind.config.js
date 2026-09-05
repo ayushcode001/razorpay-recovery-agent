@@ -7,14 +7,14 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#2748E0',
-          hover: '#1E3AB8',
-          dark: '#1E3AB8',
-          light: '#EBF0FF',
-          50: '#F0F4FF',
-          100: '#DBEAFE',
-          600: '#2748E0',
-          700: '#1E3AB8',
+          DEFAULT: '#0F766E',
+          hover: '#115E59',
+          dark: '#115E59',
+          light: '#F0FDFA',
+          50: '#F0FDFA',
+          100: '#CCFBF1',
+          600: '#0F766E',
+          700: '#115E59',
         },
         navy: {
           DEFAULT: '#111827',

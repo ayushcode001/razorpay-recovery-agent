@@ -66,7 +66,7 @@ export function CheckoutTrigger() {
           email: 'test@example.com',
           contact: '9000000000',
         },
-        theme: { color: '#2748E0' },
+        theme: { color: '#0F766E' },
         handler: () => {
           // Rare: payment success in test mode
           setError('Payment succeeded (unexpected in demo). Try a failure card.')

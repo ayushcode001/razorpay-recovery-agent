@@ -22,7 +22,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
-  retry_later: '#2563EB',
+  retry_later: '#0F766E',
   smart_retry: '#16A34A',
   change_method: '#7C3AED',
   user_error: '#D97706',
@@ -35,7 +35,7 @@ interface SinglePanelProps {
 }
 
 function SinglePanel({ category, result }: SinglePanelProps) {
-  const color = CATEGORY_COLORS[category] ?? '#2563EB'
+  const color = CATEGORY_COLORS[category] ?? '#0F766E'
   const n = result.bandit_cum_rewards.length
   const step = Math.max(1, Math.floor(n / 200))
 

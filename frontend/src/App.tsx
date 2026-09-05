@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { AnimatePresence, motion } from 'framer-motion'
 import { ReactLenis, useLenis } from 'lenis/react'
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
@@ -53,15 +52,12 @@ function RouteScrollManager() {
   useEffect(() => {
     if (lenis) {
       lenis.scrollTo(0, { immediate: true })
-    } else {
-      window.scrollTo(0, 0)
     }
-
-    const timer = setTimeout(() => {
+    window.scrollTo(0, 0)
+    const rafId = requestAnimationFrame(() => {
       ScrollTrigger.refresh()
-    }, 150)
-
-    return () => clearTimeout(timer)
+    })
+    return () => cancelAnimationFrame(rafId)
   }, [pathname, lenis])
 
   return null
@@ -90,7 +86,7 @@ function SmoothScrollProvider({ children }: { children: ReactNode }) {
       root
       autoRaf={false}
       options={{
-        duration: 1.4,
+        duration: 1.2,
         easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
         orientation: 'vertical',
         gestureOrientation: 'vertical',
@@ -118,21 +114,11 @@ function AnimatedRoutes() {
   const location = useLocation()
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={location.pathname}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
-      >
-        <Routes location={location}>
-          <Route path="/" element={<Landing />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="*" element={<Landing />} />
-        </Routes>
-      </motion.div>
-    </AnimatePresence>
+    <Routes location={location}>
+      <Route path="/" element={<Landing />} />
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="*" element={<Landing />} />
+    </Routes>
   )
 }
 

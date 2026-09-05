@@ -14,7 +14,7 @@ import {
 import type { CohortSummary, ScatterPoint } from '@/hooks/useApi'
 import { CardSkeleton } from '@/components/LoadingSkeleton'
 
-const CLUSTER_COLORS = ['#2563EB', '#16A34A', '#D97706', '#7C3AED', '#DB2777']
+const CLUSTER_COLORS = ['#0F766E', '#16A34A', '#D97706', '#7C3AED', '#DB2777']
 
 interface Props {
   cohorts: CohortSummary[]
