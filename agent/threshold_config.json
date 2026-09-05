@@ -1,5 +1,5 @@
 {
-  "optimal_threshold": 0.47,
+  "optimal_threshold": 0.83,
   "baseline_threshold": 0.4,
   "threshold_range": [
     0.34,
@@ -9,5 +9,6 @@
   "std_threshold": 0.06241794613730893,
   "val_net_gain": 414622,
   "test_net_gain": -93503,
-  "mean_test_net_gain": -44223.6
+  "mean_test_net_gain": -44223.6,
+  "last_drift_approval": "2026-09-05T10:21:46.911037+00:00"
 }

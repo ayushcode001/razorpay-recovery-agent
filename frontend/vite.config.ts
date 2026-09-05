@@ -2,6 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+const BACKEND_TARGET = process.env.BACKEND_URL || 'http://localhost:5000'
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -13,12 +15,17 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: process.env.VITE_API_BASE_URL || 'https://razorpay-recovery-agent-rnq8.onrender.com',
+        target: BACKEND_TARGET,
         changeOrigin: true,
         secure: false,
       },
       '/create-test-order': {
-        target: process.env.VITE_API_BASE_URL || 'https://razorpay-recovery-agent-rnq8.onrender.com',
+        target: BACKEND_TARGET,
+        changeOrigin: true,
+        secure: false,
+      },
+      '/webhook': {
+        target: BACKEND_TARGET,
         changeOrigin: true,
         secure: false,
       },

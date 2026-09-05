@@ -5,8 +5,9 @@
 export const RENDER_BACKEND_DEFAULT = 'https://razorpay-recovery-agent-rnq8.onrender.com'
 
 const RAW_ENV_URL = (import.meta.env.VITE_API_BASE_URL ?? '').trim()
-// If VITE_API_BASE_URL is empty, default directly to the deployed Render backend so the app always works
-const BASE_URL = RAW_ENV_URL || RENDER_BACKEND_DEFAULT
+// In development, use relative path '' so requests flow through Vite's dev proxy without CORS issues.
+// In production builds, use VITE_API_BASE_URL or fallback to deployed Render backend.
+const BASE_URL = import.meta.env.DEV ? '' : (RAW_ENV_URL || RENDER_BACKEND_DEFAULT)
 const API_USER = import.meta.env.VITE_API_USERNAME ?? ''
 const API_PASS = import.meta.env.VITE_API_PASSWORD ?? ''
 

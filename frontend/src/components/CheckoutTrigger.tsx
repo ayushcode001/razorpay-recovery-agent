@@ -77,7 +77,7 @@ export function CheckoutTrigger() {
         name: 'Razorpay Recovery Agent',
         description: 'Test failure recovery: pick card or click Failure on OTP screen',
         prefill: {
-          name: 'Test Customer',
+          name: 'Demo Customer',
           email: 'customer@example.com',
           contact: '9876543210',
         },
@@ -90,22 +90,40 @@ export function CheckoutTrigger() {
         modal: {
           ondismiss: () => {
             setLoading(false)
-            // Refresh audit trail in case a failure happened
             queryClient.invalidateQueries({ queryKey: ['audit-trail'] })
           },
         },
       })
 
-      // Listen for payment failure event in Razorpay modal
-      rzp.on('payment.failed', (resp: unknown) => {
+      // Intercept payment failure event in Razorpay modal and report immediately
+      rzp.on('payment.failed', async (resp: unknown) => {
         setLoading(false)
-        const res = resp as { error?: { description?: string; reason?: string; metadata?: { payment_id?: string } } }
-        const paymentId = res?.error?.metadata?.payment_id || 'pay_test'
-        const reason = res?.error?.description || res?.error?.reason || 'Payment failed'
-        setNotice(`Captured payment failure (${paymentId}): "${reason}". Processing recovery decision...`)
-        setTimeout(() => {
+        const res = resp as { error?: { code?: string; description?: string; reason?: string; metadata?: { payment_id?: string } } }
+        const paymentId = res?.error?.metadata?.payment_id || `pay_manual_${Date.now()}`
+        const reason = res?.error?.description || res?.error?.reason || 'payment_failed'
+        const errorCode = res?.error?.code || 'bank_technical_error'
+
+        setNotice(`Captured payment failure (${paymentId}): "${reason}". Forwarding to Autonomous Recovery Agent...`)
+
+        try {
+          await apiFetch('/api/v1/report-failed-payment', {
+            method: 'POST',
+            body: JSON.stringify({
+              payment_id: paymentId,
+              amount,
+              error_code: errorCode,
+              error_reason: reason,
+              method: 'card',
+              email: 'customer@example.com',
+              contact: '+919876543210',
+            }),
+          })
+          setNotice(`Payment failure recorded (${paymentId}): "${reason}". Logged in Audit Trail.`)
+        } catch {
+          // If direct endpoint had an issue, the webhook polling will still catch it
+        } finally {
           queryClient.invalidateQueries({ queryKey: ['audit-trail'] })
-        }, 1200)
+        }
       })
 
       rzp.open()
@@ -125,23 +143,24 @@ export function CheckoutTrigger() {
       const res = await apiFetch<{
         status: string
         payment_id: string
-        action: string
-        category: string
-        predicted_success_prob: number
-        reason: string
+        action?: string
+        category?: string
+        predicted_success_prob?: number
+        reason?: string
       }>('/api/v1/simulate-test-failure', {
         method: 'POST',
         body: JSON.stringify({
           amount,
           error_code: 'bank_technical_error',
           method: 'card',
+          email: 'demo@example.com',
+          contact: '+919876543210',
         }),
       })
 
-      setNotice(
-        `✓ Test failure generated: ${res.payment_id} (${res.category}) -> Action: "${res.action}" (P(success)=${(res.predicted_success_prob * 100).toFixed(1)}%). Added to live Audit Trail!`
-      )
-
+      const pid = res.payment_id || 'test_payment'
+      const action = res.action ? `Action: "${res.action}"` : 'Recovery agent executed'
+      setNotice(`Test failure recorded: ${pid}. ${action}. Added to live Audit Trail.`)
       queryClient.invalidateQueries({ queryKey: ['audit-trail'] })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to simulate test failure.')
@@ -181,7 +200,7 @@ export function CheckoutTrigger() {
                 onClick={() => copyCard('4111 1111 1111 1111')}
                 className="text-2xs px-2 py-0.5 bg-surface-subtle hover:bg-primary hover:text-white border border-surface-border text-navy transition-colors font-sans"
               >
-                {copiedCard === '4111 1111 1111 1111' ? 'Copied!' : 'Copy'}
+                {copiedCard === '4111 1111 1111 1111' ? 'Copied' : 'Copy'}
               </button>
             </div>
 
@@ -195,13 +214,13 @@ export function CheckoutTrigger() {
                 onClick={() => copyCard('5267 3181 8797 5449')}
                 className="text-2xs px-2 py-0.5 bg-surface-subtle hover:bg-primary hover:text-white border border-surface-border text-navy transition-colors font-sans"
               >
-                {copiedCard === '5267 3181 8797 5449' ? 'Copied!' : 'Copy'}
+                {copiedCard === '5267 3181 8797 5449' ? 'Copied' : 'Copy'}
               </button>
             </div>
           </div>
 
           <div className="text-2xs text-muted-dark border-t border-surface-border pt-1.5 flex items-center gap-1.5">
-            <span className="font-semibold text-primary">💡 Important:</span>
+            <span className="font-semibold text-primary">Important:</span>
             <span>On the mock bank screen, click the red <strong>[Failure]</strong> button to trigger recovery.</span>
           </div>
         </div>
@@ -253,7 +272,7 @@ export function CheckoutTrigger() {
             disabled={loading || simulating}
             className="bg-surface-subtle hover:bg-surface-muted text-navy border border-surface-border text-sm font-semibold py-2.5 px-4 rounded-none disabled:opacity-60 transition-colors duration-150 flex items-center justify-center gap-2"
           >
-            {simulating ? 'Simulating…' : '⚡ 1-Click Simulate Failure'}
+            {simulating ? 'Simulating…' : '1-Click Simulate Failure'}
           </button>
         </div>
 

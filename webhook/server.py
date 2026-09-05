@@ -97,6 +97,7 @@ UNPROTECTED_PATHS = {
     "/api/v1/charts/bandit-convergence.png",
     "/create-test-order",
     "/api/v1/simulate-test-failure",
+    "/api/v1/report-failed-payment",
 }
 
 # 1. Initialize Audit Trail
@@ -306,39 +307,43 @@ def handle_razorpay_webhook():
     # 5. Execute Action (Test Mode side effects)
     execution_result = {}
     if decision["attempted"]:
-        amount_in_paise = int(amount_in_rupees * 100)
-        action_name = decision["action"]
+        try:
+            amount_in_paise = int(amount_in_rupees * 100)
+            action_name = decision["action"]
 
-        if action_name in ("retry_after_cooldown", "retry_with_backoff"):
-            plink = create_payment_link(
-                amount_in_paise=amount_in_paise,
-                description=f"Autonomous Recovery for failed payment {payment_id}",
-                customer_email=customer_email,
-                customer_contact=customer_contact,
-                notify_customer=True,
-            )
-            execution_result["payment_link"] = plink.get("short_url") or plink.get("id")
-            execution_result["status"] = "payment_link_created"
+            if action_name in ("retry_after_cooldown", "retry_with_backoff"):
+                plink = create_payment_link(
+                    amount_in_paise=amount_in_paise,
+                    description=f"Autonomous Recovery for failed payment {payment_id}",
+                    customer_email=customer_email,
+                    customer_contact=customer_contact,
+                    notify_customer=True,
+                )
+                execution_result["payment_link"] = plink.get("short_url") or plink.get("id")
+                execution_result["status"] = "payment_link_created"
 
-        elif action_name in ("prompt_new_payment_method", "reprompt_customer"):
-            plink = create_payment_link(
-                amount_in_paise=amount_in_paise,
-                description=f"Retry payment {payment_id} with alternative method or details",
-                customer_email=customer_email,
-                customer_contact=customer_contact,
-                notify_customer=True,
-            )
-            recovery_url = plink.get("short_url") or f"https://rzp.io/i/{plink.get('id')}"
-            notif_res = send_recovery_notification(
-                recipient_email=customer_email,
-                payment_id=payment_id,
-                amount_in_rupees=amount_in_rupees,
-                action=action_name,
-                recovery_link=recovery_url,
-                reason=decision["reason"],
-            )
-            execution_result["payment_link"] = recovery_url
-            execution_result["notification"] = notif_res
+            elif action_name in ("prompt_new_payment_method", "reprompt_customer"):
+                plink = create_payment_link(
+                    amount_in_paise=amount_in_paise,
+                    description=f"Retry payment {payment_id} with alternative method or details",
+                    customer_email=customer_email,
+                    customer_contact=customer_contact,
+                    notify_customer=True,
+                )
+                recovery_url = plink.get("short_url") or f"https://rzp.io/i/{plink.get('id')}"
+                notif_res = send_recovery_notification(
+                    recipient_email=customer_email,
+                    payment_id=payment_id,
+                    amount_in_rupees=amount_in_rupees,
+                    action=action_name,
+                    recovery_link=recovery_url,
+                    reason=decision["reason"],
+                )
+                execution_result["payment_link"] = recovery_url
+                execution_result["notification"] = notif_res
+        except Exception as e:
+            print(f"[Agent Server] Action execution notice: {e}")
+            execution_result["execution_note"] = str(e)
 
     # 6. Log to Audit Trail (Persisted to PostgreSQL)
     audit_trail.log(
@@ -1357,6 +1362,53 @@ def simulate_test_failure_endpoint():
     execution_result = {}
     if decision["attempted"]:
         execution_result["status"] = "simulated_recovery_dispatched"
+        execution_result["action_executed"] = decision["action"]
+
+    audit_trail.log(
+        record=record,
+        decision=decision,
+        outcome={"execution": execution_result} if execution_result else None,
+    )
+
+    return jsonify({
+        "status": "processed",
+        "payment_id": payment_id,
+        "action": decision["action"],
+        "category": decision["category"],
+        "predicted_success_prob": round(prob, 3),
+        "reason": decision["reason"],
+    }), 200
+
+
+@app.route("/api/v1/report-failed-payment", methods=["POST"])
+def report_failed_payment_endpoint():
+    """Captures a failed payment from client checkout and logs it to Audit Trail."""
+    req_data = request.get_json(silent=True) or {}
+    payment_id = req_data.get("payment_id") or f"pay_rep_{int(time.time())}"
+    raw_amount = float(req_data.get("amount", 50000))
+    amount_in_rupees = raw_amount / 100.0 if raw_amount > 1000 else raw_amount
+    error_code = req_data.get("error_code") or "bank_technical_error"
+    error_reason = req_data.get("error_reason") or error_code
+    method = req_data.get("method", "card")
+
+    record = {
+        "id": payment_id,
+        "amount": amount_in_rupees,
+        "currency": "INR",
+        "method": method,
+        "error_code": error_code,
+        "error_source": "gateway",
+        "error_step": "payment_processing",
+        "created_at": int(time.time()),
+        "retry_count": 0,
+    }
+
+    prob = score_record(record)
+    decision = decide_action(record, prob)
+
+    execution_result = {}
+    if decision["attempted"]:
+        execution_result["status"] = "recovery_action_dispatched"
         execution_result["action_executed"] = decision["action"]
 
     audit_trail.log(
