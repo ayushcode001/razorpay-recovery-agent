@@ -18,7 +18,7 @@ interface Props {
 
 export function AuditTrailTable({ entries, isLoading, error }: Props) {
   return (
-    <div className="bg-white border border-surface-border rounded-lg overflow-hidden shadow-sm">
+    <div className="bg-white border border-surface-border rounded-none overflow-hidden">
       <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between">
         <h2 className="text-base font-semibold text-navy">Live Audit Trail</h2>
         <div className="flex items-center gap-1.5 text-2xs text-muted">

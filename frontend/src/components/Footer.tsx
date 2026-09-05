@@ -15,7 +15,7 @@ export function Footer() {
             href={LINKEDIN}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-navy hover:text-primary transition-colors font-medium"
+            className="text-navy hover:text-primary transition-colors duration-150 font-semibold"
           >
             Aayushmaan Patel
           </a>{' '}

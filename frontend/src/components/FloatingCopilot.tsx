@@ -124,17 +124,17 @@ export function FloatingCopilot() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="mb-4 w-[calc(100vw-32px)] sm:w-[380px] max-h-[82vh] sm:max-h-[580px] bg-white border border-surface-border rounded-2xl shadow-2xl overflow-hidden flex flex-col ring-1 ring-black/5"
+            className="mb-4 w-[calc(100vw-32px)] sm:w-[380px] max-h-[82vh] sm:max-h-[580px] bg-white border border-surface-border rounded-none shadow-lg overflow-hidden flex flex-col"
           >
             {/* Header */}
-            <div className="px-4 py-3.5 bg-navy text-white flex items-center justify-between">
+            <div className="px-4 py-3 bg-navy text-white flex items-center justify-between">
               <h2 className="text-sm font-semibold text-white">Copilot</h2>
 
               <div className="flex items-center gap-1.5">
                 {Boolean(lastContext) && (
                   <button
                     onClick={() => setShowContext(v => !v)}
-                    className="text-3xs font-mono text-muted-lighter hover:text-white transition-colors border border-white/15 px-1.5 py-1 rounded-none"
+                    className="text-3xs font-mono text-muted-lighter hover:text-white transition-colors duration-150 border border-white/15 px-1.5 py-1 rounded-none"
                     title="Inspect grounding payload"
                   >
                     {showContext ? 'Hide' : 'Context'}
@@ -142,7 +142,7 @@ export function FloatingCopilot() {
                 )}
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="w-7 h-7 rounded-none hover:bg-white/10 flex items-center justify-center text-muted-lighter hover:text-white transition-colors text-sm"
+                  className="w-7 h-7 rounded-none hover:bg-white/10 flex items-center justify-center text-muted-lighter hover:text-white transition-colors duration-150 text-sm"
                   aria-label="Close copilot"
                 >
                   ✕
@@ -157,7 +157,7 @@ export function FloatingCopilot() {
                   <button
                     key={p}
                     onClick={() => sendMessage(p)}
-                    className="text-2xs text-left text-primary hover:text-primary-dark bg-white border border-primary-light/40 hover:border-primary px-2.5 py-1.5 rounded-none transition-all shadow-xs"
+                    className="text-2xs text-left text-navy bg-white border border-surface-border hover:border-surface-border-dark px-2.5 py-1.5 rounded-none transition-colors duration-150"
                   >
                     {p}
                   </button>
@@ -174,10 +174,10 @@ export function FloatingCopilot() {
               )}
               {messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-xl px-3.5 py-2.5 leading-relaxed ${
+                  <div className={`max-w-[85%] rounded-none px-3.5 py-2.5 leading-relaxed ${
                     m.role === 'user'
-                      ? 'bg-primary text-white rounded-br-none shadow-sm'
-                      : 'bg-surface-subtle border border-surface-border text-navy rounded-bl-none'
+                      ? 'bg-primary text-white'
+                      : 'bg-surface-subtle border border-surface-border text-navy'
                   }`}>
                     <div className="whitespace-pre-wrap">{m.content}</div>
                     {m.grounded_count != null && m.role === 'assistant' && (
@@ -192,11 +192,9 @@ export function FloatingCopilot() {
               ))}
               {copilot.isPending && (
                 <div className="flex justify-start">
-                  <div className="bg-surface-subtle border border-surface-border rounded-xl rounded-bl-none px-3.5 py-2">
+                  <div className="bg-surface-subtle border border-surface-border rounded-none px-3.5 py-2">
                     <span className="inline-flex gap-1.5 items-center text-xs text-muted">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
                       <span className="text-3xs text-muted ml-1">Analyzing audit trail...</span>
                     </span>
                   </div>
@@ -229,13 +227,13 @@ export function FloatingCopilot() {
                 placeholder="Ask about payment recoveries…"
                 maxLength={500}
                 disabled={copilot.isPending}
-                className="flex-1 text-xs border border-surface-border rounded-none px-3 py-2 outline-none focus:ring-1 focus:ring-primary/30 focus:border-primary transition-colors placeholder:text-muted-light disabled:opacity-50"
+                className="flex-1 text-xs border border-surface-border rounded-none px-3 py-2 outline-none focus:border-primary transition-colors duration-150 placeholder:text-muted-light disabled:opacity-50"
               />
               <button
                 id="floating-copilot-send"
                 onClick={() => sendMessage(input)}
                 disabled={copilot.isPending || !input.trim()}
-                className="bg-primary text-white text-xs font-semibold px-3.5 py-2 rounded-none hover:bg-primary-dark disabled:opacity-50 transition-colors shadow-xs shrink-0"
+                className="bg-primary text-white text-xs font-semibold px-3.5 py-2 rounded-none hover:bg-primary-dark disabled:opacity-50 transition-colors duration-150 shrink-0"
               >
                 Send
               </button>
@@ -245,16 +243,14 @@ export function FloatingCopilot() {
       </AnimatePresence>
 
       {/* ── FLOATING ACTION BUTTON (COLLAPSED) ── */}
-      <motion.button
+      <button
         id="floating-copilot-btn"
         onClick={toggleOpen}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
         aria-label={isOpen ? "Close copilot chat" : "Open copilot chat"}
-        className={`w-13 h-13 sm:w-14 sm:h-14 rounded-none shadow-xl flex items-center justify-center transition-all duration-300 relative ${
+        className={`w-12 h-12 sm:w-13 sm:h-13 rounded-none flex items-center justify-center transition-colors duration-150 relative ${
           isOpen
-            ? 'bg-navy text-white ring-2 ring-navy-light/40'
-            : 'bg-primary text-white hover:bg-primary-hover shadow-primary/25 ring-2 ring-primary/20'
+            ? 'bg-navy text-white'
+            : 'bg-primary text-white hover:bg-primary-dark'
         }`}
       >
         <span className="sr-only">{isOpen ? "Close Copilot" : "Open Copilot"}</span>
@@ -274,7 +270,7 @@ export function FloatingCopilot() {
 
         {/* Live indicator dot */}
         <span className="absolute top-0 right-0 w-3.5 h-3.5 rounded-full bg-success border-2 border-white" />
-      </motion.button>
+      </button>
     </aside>
   )
 }

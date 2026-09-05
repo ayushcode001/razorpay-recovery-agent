@@ -4,19 +4,18 @@
 
 @layer base {
   :root {
-    --color-primary: #2563EB;
-    --color-primary-dark: #1D4ED8;
-    --color-navy: #0F172A;
+    --color-primary: #2748E0;
+    --color-primary-dark: #1E3AB8;
+    --color-navy: #111827;
     --color-surface: #FFFFFF;
-    --color-surface-muted: #F8FAFC;
-    --color-border: #E2E8F0;
-    --color-text: #0F172A;
-    --color-muted: #64748B;
+    --color-surface-muted: #F5F6F8;
+    --color-border: #E5E7EB;
+    --color-text: #111827;
+    --color-muted: #6B7280;
   }
 
-
   body {
-    @apply font-sans text-navy bg-white antialiased;
+    @apply font-sans text-muted bg-white antialiased text-base leading-relaxed;
     font-feature-settings: 'cv11', 'ss01';
   }
 
@@ -31,23 +30,23 @@
   }
 
   .section-pad {
-    @apply py-20;
+    @apply py-24;
   }
 
-  /* Stat card: number + label, nothing else */
+  /* Stat card: clean large number + small label */
   .stat-number {
-    @apply font-mono text-3xl font-semibold tracking-tight tabular-nums;
+    @apply text-3xl md:text-4xl font-semibold text-navy tracking-tight tabular-nums;
   }
 
   /* Subtle entry animation */
   .fade-up {
-    animation: fadeUp 0.5s ease-out both;
+    animation: fadeUp 0.4s ease-out both;
   }
 
   @keyframes fadeUp {
     from {
       opacity: 0;
-      transform: translateY(16px);
+      transform: translateY(8px);
     }
     to {
       opacity: 1;
@@ -57,15 +56,15 @@
 
   /* Skeleton loading pulse */
   .skeleton {
-    @apply bg-surface-subtle rounded animate-pulse;
+    @apply bg-surface-subtle rounded-none animate-pulse;
   }
 
-  /* Action pill badges - light mode */
+  /* Action pill badges - low saturation, clean */
   .pill {
-    @apply inline-flex items-center px-2 py-0.5 rounded text-2xs font-semibold tracking-wide uppercase;
+    @apply inline-flex items-center px-2 py-0.5 rounded-none text-2xs font-semibold tracking-wide uppercase;
   }
   .pill-retry {
-    @apply bg-primary-light text-primary-dark border border-primary/20;
+    @apply bg-primary-50 text-primary border border-primary/20;
   }
   .pill-prompt {
     @apply bg-success-light text-success-text border border-success/20;
@@ -77,86 +76,51 @@
     @apply bg-warning-light text-warning-text border border-warning/20;
   }
 
-  /* Interactive card with lift, soft glow, and shimmer sheen sweep */
+  /* Clean minimal card - flat fill, 1px border shift on hover, 150ms transition */
   .card-interactive {
-    @apply relative overflow-hidden bg-white border border-surface-border rounded-lg p-5 shadow-sm transition-all duration-300;
+    @apply relative bg-white border border-surface-border rounded-none p-6 transition-colors duration-150;
   }
 
   .card-interactive:hover {
-    @apply border-primary/40 -translate-y-0.5 shadow-md shadow-primary/5 ring-1 ring-primary/20;
+    @apply border-surface-border-dark;
   }
 
-  .card-interactive::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -150%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(
-      115deg,
-      transparent 0%,
-      transparent 40%,
-      rgba(37, 99, 235, 0.08) 50%,
-      transparent 60%,
-      transparent 100%
-    );
-    pointer-events: none;
-    transition: left 0.75s ease;
-  }
-
-  .card-interactive:hover::after {
-    left: 150%;
-  }
-
-  /* Card dark alias mapped cleanly to light card-interactive */
   .card-dark {
-    @apply relative overflow-hidden bg-white border border-surface-border rounded-lg p-5 shadow-sm transition-all duration-300;
+    @apply relative bg-white border border-surface-border rounded-none p-6 transition-colors duration-150;
   }
 
   .card-dark:hover {
-    @apply border-primary/40 -translate-y-0.5 shadow-md shadow-primary/5 ring-1 ring-primary/20;
+    @apply border-surface-border-dark;
   }
 
   /* Arch diagram node */
   .arch-node {
-    @apply relative overflow-hidden bg-white border border-surface-border rounded-md p-3 shadow-sm transition-all duration-200;
+    @apply relative bg-white border border-surface-border rounded-none p-3.5 transition-colors duration-150;
   }
 
   .arch-node:hover {
-    @apply -translate-y-0.5 shadow-md shadow-primary/5 ring-1 ring-primary/25 border-primary/40;
+    @apply border-surface-border-dark;
   }
 
-  /* Arch diagram node - mapped to light theme */
   .arch-node-dark {
-    @apply relative overflow-hidden bg-white border border-surface-border rounded-md p-3 shadow-sm transition-all duration-200;
+    @apply relative bg-white border border-surface-border rounded-none p-3.5 transition-colors duration-150;
   }
 
   .arch-node-dark:hover {
-    @apply -translate-y-0.5 shadow-md shadow-primary/5 ring-1 ring-primary/25 border-primary/40;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .card-interactive,
-    .card-interactive:hover,
-    .card-dark,
-    .card-dark:hover,
-    .arch-node,
-    .arch-node:hover,
-    .arch-node-dark,
-    .arch-node-dark:hover {
-      transform: none !important;
-      transition: border-color 0.2s, box-shadow 0.2s !important;
-    }
-    .card-interactive::after,
-    .card-dark::after {
-      display: none !important;
-    }
+    @apply border-surface-border-dark;
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* Subtle 2% opacity grid on white/soft gray */
+  .subtle-grid {
+    background-size: 32px 32px;
+    background-image: 
+      linear-gradient(to right, rgba(0, 0, 0, 0.025) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 0, 0, 0.025) 1px, transparent 1px);
   }
 }

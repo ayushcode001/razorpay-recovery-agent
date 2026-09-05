@@ -41,7 +41,7 @@ function ProposalCard({ proposal }: { proposal: PolicyProposal }) {
   const gain = proposal.estimated_net_value_gain ?? (proposal.net_value_proposed_threshold - proposal.net_value_current_threshold)
 
   return (
-    <div className="border border-surface-border rounded-lg p-4 bg-white shadow-xs">
+    <div className="border border-surface-border rounded-none p-4 bg-white">
       <div className="flex items-start justify-between gap-4 mb-3">
         <div>
           <div className="font-mono text-xs text-muted">{proposal.proposal_id}</div>
@@ -72,7 +72,7 @@ function ProposalCard({ proposal }: { proposal: PolicyProposal }) {
             id={`approve-${proposal.proposal_id}`}
             onClick={() => handleAction('approve')}
             disabled={approve.isPending || reject.isPending}
-            className="flex-1 text-sm font-medium py-1.5 px-3 rounded-none bg-success text-white hover:bg-success/90 disabled:opacity-50 transition-colors shadow-xs"
+            className="flex-1 text-sm font-semibold py-1.5 px-3 rounded-none bg-success text-white hover:bg-success/90 disabled:opacity-50 transition-colors duration-150"
           >
             {approve.isPending ? 'Approving…' : 'Approve'}
           </button>
@@ -80,7 +80,7 @@ function ProposalCard({ proposal }: { proposal: PolicyProposal }) {
             id={`reject-${proposal.proposal_id}`}
             onClick={() => handleAction('reject')}
             disabled={approve.isPending || reject.isPending}
-            className="flex-1 text-sm font-medium py-1.5 px-3 rounded-none bg-surface-subtle text-navy border border-surface-border hover:bg-surface-border disabled:opacity-50 transition-colors shadow-xs"
+            className="flex-1 text-sm font-semibold py-1.5 px-3 rounded-none bg-transparent text-navy border border-surface-border hover:border-surface-border-dark disabled:opacity-50 transition-colors duration-150"
           >
             {reject.isPending ? 'Rejecting…' : 'Reject'}
           </button>
@@ -99,7 +99,7 @@ interface Props {
 
 export function DriftProposalPanel({ proposals, currentThreshold, isLoading, error }: Props) {
   return (
-    <div className="bg-white border border-surface-border rounded-lg shadow-sm overflow-hidden">
+    <div className="bg-white border border-surface-border rounded-none overflow-hidden">
       <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between">
         <div>
           <h2 className="text-base font-semibold text-navy">Policy Proposals</h2>

@@ -4,26 +4,19 @@
 interface StatCardProps {
   label: string
   value: string | number
-  color?: 'default' | 'success' | 'warning' | 'danger' | 'primary'
-  footnote?: string // Only for genuinely ambiguous numbers (the -0.38% exception)
+  color?: 'default' | 'success' | 'warning' | 'danger' | 'primary' | 'navy'
+  footnote?: string
   className?: string
   dark?: boolean
 }
 
-const colorMapLight = {
+const colorMapLight: Record<string, string> = {
   default: 'text-navy',
+  navy: 'text-navy',
   primary: 'text-primary',
   success: 'text-success',
   warning: 'text-warning',
   danger: 'text-danger',
-}
-
-const colorMapDark = {
-  default: 'text-dark-cream',
-  primary: 'text-amber',
-  success: 'text-emerald-400',
-  warning: 'text-amber-light',
-  danger: 'text-rose-400',
 }
 
 export function StatCard({
@@ -32,18 +25,17 @@ export function StatCard({
   color = 'default',
   footnote,
   className = '',
-  dark = false,
 }: StatCardProps) {
-  const colorMap = dark ? colorMapDark : colorMapLight
+  const numberColor = colorMapLight[color] || 'text-navy'
 
   return (
-    <div className={`${dark ? 'card-dark' : 'card-interactive'} cursor-default ${className}`}>
-      <div className={`text-xs md:text-sm mb-2 font-medium ${dark ? 'text-dark-muted' : 'text-muted'}`}>
+    <div className={`bg-white border border-surface-border p-5 rounded-none ${className}`}>
+      <div className={`stat-number ${numberColor}`}>{value}</div>
+      <div className="text-xs text-muted mt-1 font-normal">
         {label}
       </div>
-      <div className={`stat-number ${colorMap[color]}`}>{value}</div>
       {footnote && (
-        <div className={`mt-2 text-2xs leading-snug ${dark ? 'text-dark-subtle' : 'text-muted'}`}>
+        <div className="mt-2 text-2xs leading-snug text-muted">
           {footnote}
         </div>
       )}

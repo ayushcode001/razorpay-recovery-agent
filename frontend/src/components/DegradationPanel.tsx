@@ -17,7 +17,7 @@ interface Props {
 
 export function DegradationPanel({ incidents, isLoading, error }: Props) {
   return (
-    <div className="bg-white border border-surface-border rounded-lg shadow-sm overflow-hidden">
+    <div className="bg-white border border-surface-border rounded-none overflow-hidden">
       <div className="px-5 py-4 border-b border-surface-border flex items-center justify-between">
         <h2 className="text-base font-semibold text-navy">Degradation Alerts</h2>
         {incidents.length > 0 && (
@@ -41,7 +41,7 @@ export function DegradationPanel({ incidents, isLoading, error }: Props) {
         )}
 
         {incidents.map((inc, i) => (
-          <div key={i} className="border border-warning/40 bg-warning-light/30 rounded-md p-4">
+          <div key={i} className="border border-warning/30 bg-warning-light/20 rounded-none p-4">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="flex items-center gap-2">

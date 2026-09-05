@@ -66,7 +66,7 @@ export function CheckoutTrigger() {
           email: 'test@example.com',
           contact: '9000000000',
         },
-        theme: { color: '#2563EB' },
+        theme: { color: '#2748E0' },
         handler: () => {
           // Rare: payment success in test mode
           setError('Payment succeeded (unexpected in demo). Try a failure card.')
@@ -87,7 +87,7 @@ export function CheckoutTrigger() {
   }
 
   return (
-    <div className="bg-white border border-surface-border rounded-lg shadow-sm overflow-hidden">
+    <div className="bg-white border border-surface-border rounded-none overflow-hidden">
       <div className="px-5 py-4 border-b border-surface-border">
         <h2 className="text-base font-semibold text-navy">Checkout Demo</h2>
         <div className="text-xs text-muted mt-0.5">Test mode · Use Razorpay failure card numbers</div>
@@ -120,7 +120,7 @@ export function CheckoutTrigger() {
           id="checkout-trigger-btn"
           onClick={triggerCheckout}
           disabled={loading}
-          className="w-full bg-primary hover:bg-primary-dark text-white text-sm font-semibold py-2.5 rounded-none disabled:opacity-60 transition-colors shadow-xs"
+          className="w-full bg-primary hover:bg-primary-dark text-white text-sm font-semibold py-2.5 rounded-none disabled:opacity-60 transition-colors duration-150"
         >
           {loading ? 'Opening Razorpay…' : 'Trigger Test Payment'}
         </button>
