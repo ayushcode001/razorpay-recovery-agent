@@ -95,6 +95,8 @@ UNPROTECTED_PATHS = {
     "/bandit_convergence.png",
     "/api/v1/charts/cohort-scatter.png",
     "/api/v1/charts/bandit-convergence.png",
+    "/create-test-order",
+    "/api/v1/simulate-test-failure",
 }
 
 # 1. Initialize Audit Trail
@@ -1325,6 +1327,52 @@ def create_test_order_endpoint():
         "amount": amount,
         "key_id": RAZORPAY_KEY_ID or "rzp_test_mockKey",
     })
+
+
+@app.route("/api/v1/simulate-test-failure", methods=["POST"])
+def simulate_test_failure_endpoint():
+    """Simulates a failed transaction and runs it through the autonomous recovery pipeline."""
+    req_data = request.get_json(silent=True) or {}
+    raw_amount = float(req_data.get("amount", 50000))
+    amount_in_rupees = raw_amount / 100.0 if raw_amount > 1000 else raw_amount
+    error_code = req_data.get("error_code", "bank_technical_error")
+    method = req_data.get("method", "card")
+    payment_id = f"pay_sim_{int(time.time())}"
+
+    record = {
+        "id": payment_id,
+        "amount": amount_in_rupees,
+        "currency": "INR",
+        "method": method,
+        "error_code": error_code,
+        "error_source": "gateway",
+        "error_step": "payment_processing",
+        "created_at": int(time.time()),
+        "retry_count": 0,
+    }
+
+    prob = score_record(record)
+    decision = decide_action(record, prob)
+
+    execution_result = {}
+    if decision["attempted"]:
+        execution_result["status"] = "simulated_recovery_dispatched"
+        execution_result["action_executed"] = decision["action"]
+
+    audit_trail.log(
+        record=record,
+        decision=decision,
+        outcome={"execution": execution_result} if execution_result else None,
+    )
+
+    return jsonify({
+        "status": "processed",
+        "payment_id": payment_id,
+        "action": decision["action"],
+        "category": decision["category"],
+        "predicted_success_prob": round(prob, 3),
+        "reason": decision["reason"],
+    }), 200
 
 
 # -------------------------------------------------------------------------
